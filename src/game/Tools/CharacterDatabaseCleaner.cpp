@@ -110,6 +110,13 @@ bool CharacterDatabaseCleaner::SkillCheck(uint32 skill)
 
 void CharacterDatabaseCleaner::CleanCharacterSkills()
 {
+
+
+	MessageBoxW(NULL,L"richard : WARNING : CleanCharacterSkills",  L"richard box", 0); 
+
+
+
+
     CheckUnique("skill", "character_skills", &SkillCheck);
 }
 
@@ -120,6 +127,14 @@ bool CharacterDatabaseCleaner::SpellCheck(uint32 spell_id)
 
 void CharacterDatabaseCleaner::CleanCharacterSpell()
 {
+
+
+	MessageBoxW(NULL,L"richard : WARNING : CleanCharacterSpell",  L"richard box", 0); 
+
+
+
+
+
     CheckUnique("spell", "character_spell", &SpellCheck);
 }
 

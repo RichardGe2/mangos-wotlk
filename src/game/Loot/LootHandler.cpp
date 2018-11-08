@@ -27,6 +27,332 @@
 #include "Entities/Object.h"
 #include "Groups/Group.h"
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//  RETURN TRUE si le loot est accepté
+//  RETURN FALSE si le loot est refusé
+//
+// lootTypeItemOrGold = 1  pour item loot
+// lootTypeItemOrGold = 2  pour gold loot
+bool WorldSession::RichaHandleLootRandom(Loot* loot, int lootTypeItemOrGold )
+{
+
+	// a l'epoque de boulette et bouillot on a mis  2000.  c'etait tres bien, pour 2 corp a corp
+	// avec adibou et bouzigouloum , c'est trop court.
+	const uint32 g___palier_ms = 15000; // richard
+
+	const uint32 maxDice = 1000; // richard
+
+	std::string DEBUG_TEXT_LOOT = "??";
+	if ( lootTypeItemOrGold == 1 )
+	{
+		DEBUG_TEXT_LOOT = "LOOT-ITEM";
+	}
+	if ( lootTypeItemOrGold == 2 )
+	{
+		DEBUG_TEXT_LOOT = "LOOT-GOLD";
+	}
+
+
+	//richard : pour eviter d'avantager qqun qui est plus proche du server, tout les auto store loot sont interdit avant X secondes
+
+	bool lootOrigin_creature = false;
+	bool lootOrigin_gameobj = false;
+	bool lootOrigin_item = false;
+
+	if ( loot->GetLootTarget() )
+	{
+		lootOrigin_creature = loot->GetLootTarget()->GetObjectGuid().IsCreature();
+		lootOrigin_gameobj = loot->GetLootTarget()->GetObjectGuid().IsGameObject();
+	}
+	//lootOrigin_item = loot->item->GetObjectGuid().IsItem();
+	
+	LootType lootType = loot->GetLootType();
+
+	// 0   undef
+	// 1   creature corpse
+	// 2   gameobj
+	// 3   item - marche pas
+	// 4  skinning
+	int lootOrigin = 0;
+	if ( lootOrigin_creature && !lootOrigin_gameobj && !lootOrigin_item )
+	{
+		if ( lootType == LOOT_SKINNING )
+		{
+			lootOrigin = 4;
+		}
+		else if ( lootType == LOOT_CORPSE )
+		{
+			lootOrigin = 1;
+		}
+		else
+		{
+			sLog.outBasic("RICHAR: LOOT - type lootOrigin_creature + ????(%d)" , lootType );
+			lootOrigin = 0;
+			int aa=0;
+		}
+		
+		
+		//sLog.outBasic("RICHAR: LOOT - type creature" );
+		
+	}
+	else if ( !lootOrigin_creature && lootOrigin_gameobj  && !lootOrigin_item )
+	{
+		//sLog.outBasic("RICHAR: LOOT - type gameobj" );
+		lootOrigin = 2;
+	}
+	else if ( !lootOrigin_creature && !lootOrigin_gameobj  && lootOrigin_item )
+	{
+		// j'ai pas encore reussi a trouver quand ca vient d'un objet (exemple quand on desanchante)
+		//sLog.outBasic("RICHAR: LOOT - type item" ); 
+		lootOrigin = 3;
+	}
+	else
+	{
+		sLog.outBasic("RICHAR: LOOT - type ??? (object loot?)" );
+		lootOrigin = 0;
+		int aa=0;
+	}
+
+	uint32 difference = WorldTimer::getMSTime()  - loot->m_richard_timeCreated;
+
+	g_wantLoot[loot->m_richard_timeCreated].list[_player].nbFois ++;
+
+	Group* groupPlay = _player->GetGroup();
+	int nbPLayInGroup = 1;
+	if ( groupPlay )
+	{
+		nbPLayInGroup = groupPlay->GetMembersCount();
+	}
+
+	if ( g_wantLoot[loot->m_richard_timeCreated].list[_player].scoreDice == -1 ) // si le dés n'est pas jeté
+	{
+		uint32 scorede = urand(2, maxDice);
+		const char* playerName = _player->GetName();
+
+		g_wantLoot[loot->m_richard_timeCreated].list[_player].scoreDice = scorede;
+
+		//si le joueur se présente en retard, on lui donne un très mauvais dès
+		if ( difference >= g___palier_ms  )
+		{
+			g_wantLoot[loot->m_richard_timeCreated].list[_player].scoreDice = 1; // 1 correspond au score de retard
+		}
+
+		if ( !g_wantLoot[loot->m_richard_timeCreated].okWinDoneOnThisLoot  // ca sert a rien d'embrouiller les joueurs avec des infos useless - on s'en fou du score quand c'est pour looter un OKWIN
+			&& lootOrigin == 1 // on dit le MOI que sur les cadavres
+			&& nbPLayInGroup > 1 // on dit MOI que dans un groupe
+			)
+		{
+			char sayMoiMoiMoi[256];
+			sprintf_s(sayMoiMoiMoi,"Moi! %d", g_wantLoot[loot->m_richard_timeCreated].list[_player].scoreDice );
+			_player->Say(sayMoiMoiMoi , LANG_UNIVERSAL);
+		}
+
+	}
+
+	if (
+		//!g_wantLoot[loot->m_richard_timeCreated].okWinDoneOnThisLoot // si un OKWIN a été fait pour ce loot, ---> alors on peut direct aller a l'election du vainqueur  <-- pas besoin de ce check , car maintenant un OKWIN va creer une candidature avec score de 0 pour celui qui a fait le OKWIN
+		//&&
+		difference < g___palier_ms  // si le temps de présentation est passé ---> alors on peut direct aller a l'election du vainqueur
+		&&
+		g_wantLoot[loot->m_richard_timeCreated].list.size() < nbPLayInGroup  // si on est deja 2 joueurs a se présenter ---> alors on peut direct aller a l'election du vainqueur
+		&&
+		lootOrigin == 1 // si le loot est pas de type creature ---> alors on peut direct aller a l'election du vainqueur
+		&&
+		g_wantLoot[loot->m_richard_timeCreated].winner == nullptr // si le winner a deja été decidé ---> alors on peut direct aller a l'election du vainqueur
+	
+		// .... dans tous les autres cas, on attends d'avoir une de ces condition de respecter, avant d'elir le winner ...
+
+		) // pour rajouter un peu d'aleatoire, le palier est re-tiré au random a chaque fois 
+	{
+		sLog.outBasic("RICHAR: DEBUG_TEXT_LOOT - REFUSE a %s - %d < %d  (nbCandidat=%d) (group de %d)", _player->GetName() ,difference, g___palier_ms ,g_wantLoot[loot->m_richard_timeCreated].list.size() , nbPLayInGroup );
+		return false;
+	}
+	else
+	{
+
+		//si le gagnant a pas encore été decidé, c'est le moment
+		if ( g_wantLoot[loot->m_richard_timeCreated].winner == nullptr )
+		{
+			
+			int nbJoueur = g_wantLoot[loot->m_richard_timeCreated].list.size();
+
+
+			if ( nbJoueur == 0 )
+			{
+				//je crois que ce cas est pas possible
+				sLog.outBasic("RICHAR: DEBUG_TEXT_LOOT - personne a reclame le loot donc on donne direct a %s"  ,  _player->GetName()  );
+				g_wantLoot[loot->m_richard_timeCreated].winner = _player;
+			}
+			else
+			{
+				int bestScoreDice = -1;
+				for(auto const &ent1 : g_wantLoot[loot->m_richard_timeCreated].list) 
+				{
+					if ( ent1.second.scoreDice >= bestScoreDice )
+					{
+						g_wantLoot[loot->m_richard_timeCreated].winner = ent1.first;
+						bestScoreDice = ent1.second.scoreDice;
+					}
+				}
+
+				//si on est dans un groupe et que un seul joueur etait candidat, c'est pas mal
+				//de le signaler pour s'assurer que tout le groupe est d'accord qu'il y a des gens qui
+				//ne se sont pas présenté aux elections
+				if ( groupPlay != NULL 
+					&& nbJoueur < nbPLayInGroup 
+					&& lootOrigin == 1 
+					//&& !g_wantLoot[loot->m_richard_timeCreated].winnerSaidIWinAlone 
+					&& !g_wantLoot[loot->m_richard_timeCreated].okWinDoneOnThisLoot // ca sert a rien de /SAY pour looter un okwin
+					)
+				{
+					char messageOut[1024];
+					if ( loot->GetLootTarget() )
+					{
+						sprintf(messageOut, "je gagne seul '%s' !" , loot->GetLootTarget()->GetName());
+					}
+					else
+					{
+						sprintf(messageOut, "je gagne seul '????' !");
+					}
+
+					g_wantLoot[loot->m_richard_timeCreated].winner->Say(messageOut, LANG_UNIVERSAL);
+					//g_wantLoot[loot->m_richard_timeCreated].winnerSaidIWinAlone = true;
+				}
+				
+				sLog.outBasic("RICHAR: DEBUG_TEXT_LOOT - le joueur qui gagne le loot est %s "  , g_wantLoot[loot->m_richard_timeCreated].winner->GetName()   );
+			
+			}
+
+		}
+
+		if ( lootTypeItemOrGold == 1 ) // si loot de type item
+		{
+			if ( !g_wantLoot[loot->m_richard_timeCreated].messageSentToPlayer_loot )
+			{
+				if ( loot->GetLootTarget() 
+					&& lootOrigin == 1  // pour les item, on envoie un message QUE si c'est sur un cadavre qu'on loot ca
+					)
+				{
+					//envoie message a tous les joueurs:
+					for(auto const &ent1 : g_wantLoot[loot->m_richard_timeCreated].list) 
+					{
+						if ( ent1.first == g_wantLoot[loot->m_richard_timeCreated].winner )
+						{
+							char messageOut[1024];
+							sprintf(messageOut, "vous gagnez le loot 'objet' (score=%d)",ent1.second.scoreDice);
+							if ( !g_wantLoot[loot->m_richard_timeCreated].okWinDoneOnThisLoot )// ca sert a rien de messager pour looter un okwin
+							{
+								ChatHandler(ent1.first).PSendSysMessage(messageOut);
+							}
+						}
+						else
+						{
+							char messageOut[1024];
+							sprintf(messageOut, "vous perdez le loot 'objet' (score=%d)",ent1.second.scoreDice);
+							if ( !g_wantLoot[loot->m_richard_timeCreated].okWinDoneOnThisLoot )// ca sert a rien de messager pour looter un okwin
+							{
+								ChatHandler(ent1.first).PSendSysMessage(messageOut);
+							}
+
+						}
+					}
+				}
+
+				g_wantLoot[loot->m_richard_timeCreated].messageSentToPlayer_loot = true;
+			}
+		}
+		if ( lootTypeItemOrGold == 2 ) // si loot de type gold
+		{
+			if ( !g_wantLoot[loot->m_richard_timeCreated].messageSentToPlayer_po )
+			{
+				if ( loot->GetLootTarget() )
+				{
+					//envoie message a tous les joueurs:
+					for(auto const &ent1 : g_wantLoot[loot->m_richard_timeCreated].list) 
+					{
+						if ( ent1.first == g_wantLoot[loot->m_richard_timeCreated].winner )
+						{
+							//chuchoter la somme au joueur (car elle est ecrit nul part)
+							int goldAmount = loot->GetGoldAmount();
+							int nbpo = goldAmount / 10000;
+							int nbpa = (goldAmount - nbpo*10000) / 100;
+							int nbpc = (goldAmount - nbpo*10000 - nbpa*100) ;
+
+							char messageOut[1024];
+							sprintf(messageOut, "vous gagnez les PO %d-%d-%d (score=%d)", nbpo, nbpa, nbpc,ent1.second.scoreDice);
+							if ( !g_wantLoot[loot->m_richard_timeCreated].okWinDoneOnThisLoot )// ca sert a rien de messager pour looter un okwin
+							{
+								ChatHandler(ent1.first).PSendSysMessage(messageOut);
+							}
+						}
+						else
+						{
+							char messageOut[1024];
+							sprintf(messageOut, "vous perdez les PO (score=%d)",ent1.second.scoreDice);
+							if ( !g_wantLoot[loot->m_richard_timeCreated].okWinDoneOnThisLoot )// ca sert a rien de messager pour looter un okwin
+							{
+								ChatHandler(ent1.first).PSendSysMessage(messageOut);
+							}
+
+						}
+					}
+				}
+
+				g_wantLoot[loot->m_richard_timeCreated].messageSentToPlayer_po = true;
+			}
+		}
+		
+
+		if ( _player == g_wantLoot[loot->m_richard_timeCreated].winner )
+		{
+			//sLog.outBasic("RICHAR: DEBUG_TEXT_LOOT - le winner %s prend son loot "  , g_wantLoot[loot->m_richard_timeCreated].winner->GetName()   );
+		}
+		else
+		{
+			//sLog.outBasic("RICHAR: DEBUG_TEXT_LOOT - REFUSE : le looser %s essaye de prendre loot. "  , _player->GetName()   );
+			//pour se faire autoriser un loot, le looser devra demander au winner de faire la commande :  .okwin
+			return false;
+		}
+		
+
+		//sLog.outBasic("RICHAR: loot accepete a %s - %d < %d", _player->GetName() ,difference, palier  );
+	}
+
+
+
+	return true;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
 {
     uint8 itemSlot;
@@ -67,6 +393,16 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
             item->SetLootState(ITEM_LOOT_CHANGED);
     }
 }
+
+
+
+
+std::map<time_t  , WorldSession::RICHARD_TRY_LOOT_WANT  > WorldSession::g_wantLoot ;  // richard
+
+
+
+
+
 
 void WorldSession::HandleLootMoneyOpcode(WorldPacket& /*recv_data*/)
 {

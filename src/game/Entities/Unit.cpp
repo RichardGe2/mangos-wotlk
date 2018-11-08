@@ -232,6 +232,21 @@ Unit::Unit() :
     m_spellUpdateHappening(false),
     m_spellProcsHappening(false)
 {
+
+
+
+
+
+
+
+	m_richar_lieuOrigin = "??POSRICH??";
+
+
+
+
+
+
+
     m_objectType |= TYPEMASK_UNIT;
     m_objectTypeId = TYPEID_UNIT;
 
@@ -1295,6 +1310,352 @@ void Unit::JustKilledCreature(Creature* victim, Player* responsiblePlayer)
 
     // only lootable if it has loot or can drop gold
     victim->PrepareBodyLootState();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	////////////////////////////////////////////////////////////////////////////////////
+	//  RICHARD  ---  quand on KILL une creature
+	//  mettre ici toutes les custom action de quand on tue une creature
+	
+	if ( GetTypeId() == TYPEID_PLAYER 
+		|| GetOwner() && GetOwner()->GetTypeId() == TYPEID_PLAYER   // ca arrive quand c'est un pet du joueur qui donne le coup de grace
+		|| responsiblePlayer
+		)
+	{
+
+
+		Player* thisPLayer = 0; // ceci est le joueur qui sera considere par moi comme le vrai tuer qui merrite la récompense
+		
+		if ( GetTypeId() == TYPEID_PLAYER  )
+		{
+			thisPLayer = ((Player*)this) ;
+		}
+		else if (  GetOwner() && GetOwner()->GetTypeId() == TYPEID_PLAYER )
+		{
+			//ce cas arrive quand un de nos pet tue un PNJ
+			const char* nameThis = GetName();
+			thisPLayer = (Player*)GetOwner() ;
+		}
+		else if ( responsiblePlayer )
+		{
+			//ce cas est assez rare mais devrait arriver dans 2 cas :
+			// - un garde d'une ville tue un mob qu'on a aggro
+			// - pendant une quete d'escorte, l'escorté tue un mob
+			thisPLayer = responsiblePlayer;
+		}
+		else
+		{
+			int aaa=0; // on devrait pas etre ici ??
+		}
+
+		
+		if ( responsiblePlayer != thisPLayer )
+		{
+			const char* name1 = 0;
+			const char* name2 = 0;
+
+			if ( responsiblePlayer )
+			{
+				name1 = responsiblePlayer->GetName();
+			}
+
+			if ( thisPLayer )
+			{
+				name2 = thisPLayer->GetName();
+			}
+
+
+
+			// ceci arrive souvent quand on est groupé,
+			// on aura  name1 = perso de Dian, et name2 = perso de richar
+			// par convention, ce bout de code ne va utiliser que  thisPLayer  et pas   responsiblePlayer
+			// a surveiller, mais je pense que ca changerai pas grand chose si je faisais l'inverse.  
+
+			//int aaaa=0;
+			//BASIC_LOG("RICHAR WARNING !!!!!!!!!!!!!!!!!!! - TML35018 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" );
+			//Sleep(20000);
+
+
+			int aaa=0;
+		}
+
+		const char* namePlayer___ = thisPLayer->GetName();
+		
+		ObjectGuid playerGUID___2 = thisPLayer->GetObjectGuid();
+		uint32 player_account = sObjectMgr.GetPlayerAccountIdByGUID(playerGUID___2);
+
+		uint32 Victime_rank = victim->GetCreatureInfo()->Rank;
+        uint32 Victime_entry = victim->GetEntry(); //  npc=XXX
+
+		Group* thisPlayer_group = thisPLayer->GetGroup();
+		std::vector<Player*> groupMembers;
+		if ( thisPlayer_group )
+		{
+			int groupSize = thisPlayer_group->GetMembersCount();
+
+			int groupSize2 = 0;
+			
+
+			for (GroupReference* itr = thisPlayer_group->GetFirstMember(); itr != nullptr; itr = itr->next())
+			{
+				Player* Target = itr->getSource();
+
+				// IsHostileTo check duel and controlled by enemy
+				if (Target 
+					//&& Target != thisPLayer 
+					)
+					groupMembers.push_back(Target);
+
+				groupSize2++;
+			}
+
+
+
+
+			if ( groupSize2 != groupSize )
+			{
+				//ce peut arriver par example si Dian_e a été deconnecté.
+				//du coup, la taille du groupe sera 2.
+				//mais quand on enum les joueurs, il n'y a que Richar_d
+				//donc rien de mechant si j'ai ce WARNING a cause de ca.
+				int aaaa=0;
+				BASIC_LOG("RICHAR WARNING !!!! %d != %d !!!!!!!!!!!!!!! - TML35118 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" ,
+					 groupSize2 , groupSize
+					);
+				//Sleep(10000);
+			}
+
+			int	aaaaa=0;
+		}
+		else
+		{
+			groupMembers.push_back(thisPLayer);
+		}
+
+
+		if ( Victime_rank == CREATURE_ELITE_RARE )
+		{
+			
+		
+			
+			std::vector<int>  mainPlayerGUID;
+			std::vector<std::string>  mainPlayerNames;
+
+			// #LISTE_ACCOUNT_HERE   -  ce hashtag repere tous les endroit que je dois updater quand je rajoute un nouveau compte - ou perso important
+			//
+			//list de tous les perso principaux de tout le monde
+			mainPlayerGUID.push_back(4);  mainPlayerNames.push_back("Boulette"); 
+			mainPlayerGUID.push_back(5);  mainPlayerNames.push_back("Bouillot"); 
+			mainPlayerGUID.push_back(27); mainPlayerNames.push_back("Bouzigouloum"); 
+			mainPlayerGUID.push_back(28);  mainPlayerNames.push_back("Adibou"); 
+					
+			int existInDataBaseV2 = -1;
+			for(int jj=0; jj<mainPlayerGUID.size(); jj++)
+			{
+				std::vector<Player::RICHA_NPC_KILLED_STAT> richa_NpcKilled;
+				std::vector<Player::RICHA_PAGE_DISCO_STAT> richa_pageDiscovered;
+				std::vector<Player::RICHA_LUNARFESTIVAL_ELDERFOUND> richa_lunerFestivalElderFound;
+				std::vector<Player::RICHA_MAISON_TAVERN> richa_maisontavern;
+				std::string persoNameImport;
+				Player::richa_importFrom_richaracter_(
+					mainPlayerGUID[jj],
+					richa_NpcKilled,
+					richa_pageDiscovered,
+					richa_lunerFestivalElderFound,
+					richa_maisontavern,
+					persoNameImport
+					);
+
+				for(int kk=0; kk<richa_NpcKilled.size(); kk++)
+				{
+					if ( richa_NpcKilled[kk].npc_id == Victime_entry )
+					{
+						existInDataBaseV2 = jj;
+						break;
+					}
+				}
+
+				if ( existInDataBaseV2 != -1 ) {  break; }
+			}
+
+			if ( existInDataBaseV2 == -1 )
+			{
+				bool pushedDone = false;
+
+				//pour chaque player du groupe
+				for(int i=0; i<groupMembers.size(); i++)
+				{
+
+					//1PA si notre perso est niveau  >=1  et  <10   
+					//10PA si notre perso est niveau  >=10  et  <20   
+					//50PA si notre perso est niveau  >=20  et  <30 
+					//1PO si notre perso est niveau  >=30  et  <40 
+					//2PO si notre perso est niveau  >=40  et  <50 
+					//4PO si notre perso est niveau  >=50  et  <60 
+					//5PO pour 60
+
+					int lvlPlayer = groupMembers[i]->getLevel();
+					int winPO = 0;
+					if ( lvlPlayer < 10 ) { winPO = 1*100; }
+					if ( lvlPlayer >= 10 && lvlPlayer < 20 ) { winPO = 10*100; }
+					if ( lvlPlayer >= 20 && lvlPlayer < 30 ) { winPO = 50*100; }
+					if ( lvlPlayer >= 30 && lvlPlayer < 40 ) { winPO = 1*100*100; }
+					if ( lvlPlayer >= 40 && lvlPlayer < 50 ) { winPO = 2*100*100; }
+					if ( lvlPlayer >= 50 && lvlPlayer < 60 ) { winPO = 4*100*100; }
+					if ( lvlPlayer >= 60 ) { winPO = 5*100*100; }
+
+					groupMembers[i]->ModifyMoney(winPO);
+
+					int goldAmount = winPO;
+					int nbpo = goldAmount / 10000;
+					int nbpa = (goldAmount - nbpo*10000) / 100;
+					int nbpc = (goldAmount - nbpo*10000 - nbpa*100) ;
+
+					uint32 groupMember_account = sObjectMgr.GetPlayerAccountIdByGUID(groupMembers[i]->GetObjectGuid());
+
+					/*
+					// #LISTE_ACCOUNT_HERE
+					// ce hashtag repere tous les endroit que je dois updater quand je rajoute un nouveau compte - ou perso important
+					if ( 			
+						//seul un non-maitre du jeu a le droit d'officiellement ajouter cette creature a la liste des découvert
+						//
+						groupMember_account == 5 ||  // richard
+						groupMember_account == 10  || // richard2
+						groupMember_account == 6 || // diane
+						groupMember_account == 9 // diane2 
+					)
+					{
+						if ( !pushedDone )
+						{
+							groupMembers[i]->m_richa_StatALL__elitGrisKilled.push_back(Victime_entry);
+							pushedDone = true;
+						}
+
+						char messageOut[2048];
+						sprintf(messageOut, "Elite gris decouvert ! + %d-%d-%d !",nbpo,nbpa,nbpc);
+						groupMembers[i]->Say(messageOut, LANG_UNIVERSAL);
+					}
+					else
+					{
+						char messageOut[2048];
+						sprintf(messageOut, "Elite gris decouvert ! + %d-%d-%d ! - mais PAS ajoute a la liste.",nbpo,nbpa,nbpc);
+						groupMembers[i]->Say(messageOut, LANG_UNIVERSAL);
+					}
+					*/
+					
+					char messageOut[2048];
+					sprintf(messageOut, "Elite gris decouvert ! + %d-%d-%d !",nbpo,nbpa,nbpc);
+					groupMembers[i]->Say(messageOut, LANG_UNIVERSAL);
+
+				}
+
+			}
+			else
+			{
+				char messageOut[2048];
+				sprintf(messageOut, "Cet Elite Gris a DEJA ete decouvert par %s" , mainPlayerNames[existInDataBaseV2].c_str() );
+				thisPLayer->Say(messageOut, LANG_UNIVERSAL);
+			}
+
+		} // si elite gris
+
+
+		
+		//on chercher si  Victime_entry  est dans  m_richa_NpcKilled
+		bool existInDataBase = false;
+		for(int i=0; i<thisPLayer->m_richa_NpcKilled.size(); i++)
+		{
+			if ( thisPLayer->m_richa_NpcKilled[i].npc_id == Victime_entry )
+			{
+				BASIC_LOG("RICHAR INFO - %s - %d  %d->%d" , thisPLayer->GetName() , Victime_entry  , thisPLayer->m_richa_NpcKilled[i].nb_killed  ,  thisPLayer->m_richa_NpcKilled[i].nb_killed+1  );
+				thisPLayer->m_richa_NpcKilled[i].nb_killed ++; // on incremente le nb de killed
+				existInDataBase = true;
+				break;
+			}
+		}
+
+		if ( !existInDataBase )
+		{
+			BASIC_LOG("RICHAR INFO - %s - %d  1" , thisPLayer->GetName(), Victime_entry   );
+			thisPLayer->m_richa_NpcKilled.push_back( Player::RICHA_NPC_KILLED_STAT(Victime_entry , 1) );
+		}
+		
+
+	}//si l'attaquant / tueur  est un joueur
+	
+	// DU COUP , j'ai changé : CE CAS SI DESSOUS EST GERE AU DESSUS
+	/*
+	else if ( responsiblePlayer )
+	{
+		//c'est pas du tout normal d'arriver la. ca devrait etre géré par le if precedent
+		
+		//c'est arrivé une fois j'ai pas bien compris,
+		//je vais rajouter plus d'info pour debugger la prochaine fois :
+		
+		// je CROIS que ce "bug" arrive quand un Garde tue un mob qu'on a aggro
+		// si c'est le cas , c'est tellement rare que c'est pas bien grave
+		// a surveiller
+
+		// a surveiller aussi dans une quete d'escorte comment ca se passe si l'escorté kill le mob
+
+		//le joueur que le jeux considere responsable de la mort
+		const char* name1 = responsiblePlayer->GetName();
+		
+		//le mob qui est mort
+		const char* name2 = 0;
+		if ( victim )
+		{
+			name2 = victim->GetName();
+		}
+
+		//celui qui a tué le mob
+		const char* name3 = this->GetName();
+
+		uint8 typeIdthis__ = this->GetTypeId();
+
+		int aaaa=0;
+		BASIC_LOG("RICHAR WARNING !!!!!!!!!!!!!!!!!!! - TML35019 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" );
+		Sleep(20000);
+		int adddaaa=0;
+	}
+	*/
+
+	// richar - END
+	////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
 
 void Unit::PetOwnerKilledUnit(Unit* pVictim)
@@ -7514,7 +7875,7 @@ uint32 Unit::SpellDamageBonusDone(Unit* pVictim, SpellEntry const* spellProto, u
 
     // Creature damage
     if (GetTypeId() == TYPEID_UNIT && !((Creature*)this)->IsPet())
-        DoneTotalMod *= Creature::_GetSpellDamageMod(((Creature*)this)->GetCreatureInfo()->Rank);
+        DoneTotalMod *= Creature::_GetSpellDamageMod(     m_richar_lieuOrigin,GetName(),GetOwner(),            ((Creature*)this)->GetCreatureInfo()->Rank);
 
     AuraList const& mModDamagePercentDone = GetAurasByType(SPELL_AURA_MOD_DAMAGE_PERCENT_DONE);
     for (auto i : mModDamagePercentDone)

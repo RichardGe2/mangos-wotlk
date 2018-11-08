@@ -2664,6 +2664,14 @@ class Unit : public WorldObject
         void CastSpell(float x, float y, float z, uint32 spell, TR triggered);
         template <typename TR>
         void CastSpell(float x, float y, float z, SpellEntry const* spell, TR triggered);
+
+
+
+
+		public: std::string m_richar_lieuOrigin;
+
+
+
 };
 
 template<typename Func>

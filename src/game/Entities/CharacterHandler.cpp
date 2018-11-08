@@ -651,6 +651,15 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
     ObjectGuid playerGuid = holder->GetGuid();
 
     Player* pCurrChar = new Player(this);
+
+
+
+
+	pCurrChar->richard_importVariables_START(playerGuid.GetRawValue());
+
+
+
+
     pCurrChar->GetMotionMaster()->Initialize();
     SetPlayer(pCurrChar, playerGuid);
     m_playerLoading = true;
@@ -883,6 +892,13 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
 
     // Handle Login-Achievements (should be handled after loading)
     pCurrChar->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ON_LOGIN, 1);
+
+
+
+
+	pCurrChar->richard_importVariables_END(playerGuid.GetRawValue());
+
+
 
     delete holder;
 }

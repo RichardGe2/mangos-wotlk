@@ -6392,6 +6392,124 @@ bool Spell::DoSummonCritter(CreatureSummonPositions& list, SummonPropertiesEntry
 
     // ATM only first position is supported for summoning
     uint32 pet_entry = m_spellInfo->EffectMiscValue[effIdx];
+
+
+
+
+
+
+
+
+	
+
+
+
+
+	
+
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// RICHARD : invoquer pokeball
+	float scalePet = -1.0f;
+	int petlevel = -1;
+	if ( m_caster && m_caster->GetTypeId() == TYPEID_PLAYER )
+	{
+		Player* player = (Player*)m_caster;
+		
+		if ( m_spellInfo->Id  ==  13548   &&  pet_entry   ==  7392 )
+		{
+			uint32 itemKeyRin0  = 0;
+			uint32 quantity = 0;
+			player->richard_countItem_pokeball(itemKeyRin0  , quantity  );
+
+			if ( itemKeyRin0 > 0 && quantity > 0 )
+			{
+				pet_entry = itemKeyRin0 - 100000;
+
+				if ( pet_entry >  100000 ) // si c'est un pokemon epic
+				{
+					pet_entry -= 100000;
+				}
+
+				scalePet = 1.0f;
+				petlevel = quantity;
+
+				if ( petlevel > 60 )
+				{
+					petlevel = 60;
+				}
+
+				scalePet = 0.25f + (float)petlevel*0.25f;
+				if ( scalePet > 2.0f ) 
+				{
+					scalePet = 2.0f;
+				}
+
+
+				//ici, au cas par cas, on va gerer la scale des youhaimon :
+				if ( pet_entry == 3917 )  // youhaimon 203917 - Elementaire d'eau
+				{
+					scalePet *= 0.5f;
+				}
+
+
+				Pet* old_critter = player->GetMiniPet();
+				if (!old_critter )
+				{
+					char messageOut[256];
+					sprintf(messageOut, "Youhaimon GO !");
+					player->Say(messageOut, LANG_UNIVERSAL);
+				}
+			
+			
+
+			}
+			else
+			{
+			
+				char messageOut[256];
+				sprintf(messageOut, "Pas de youhaimon");
+				player->Say(messageOut, LANG_UNIVERSAL);
+
+				Pet* old_critter = player->GetMiniPet();
+				if (old_critter)
+				{
+					player->RemoveMiniPet();
+				}
+
+				return false;
+			}
+		}
+	}
+
+
+	// INFO :
+	// pour certain pet,  comme la poule que Bouillot a,  ils ne vont pas follow,  car ils ont qqchose dans la colonne ScriptName  dans  creature_template.
+	// je vais laisser comme ca pour l'instant, car les gars de mangos sont en train de bosser sur l'IA,  quand ca sera stabilisé, je corrigerai ca.. je vais reflechir comment plus tard.
+	// ca a pas l'air de toucher bcp de creature niveau 1
+	//en attendant ne pas utiliser le petite creature qui ne suivent pas, et c'est tout, les garder a la banque en collection :)
+
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     CreatureInfo const* cInfo = ObjectMgr::GetCreatureTemplate(pet_entry);
     if (!cInfo)
     {
@@ -6443,6 +6561,27 @@ bool Spell::DoSummonCritter(CreatureSummonPositions& list, SummonPropertiesEntry
     critter->InitPetCreateSpells();                         // some companions may have spells (e.g. disgusting oozeling)
     if (m_duration > 0)                                     // set timer for unsummon
         critter->SetDuration(m_duration);
+
+
+
+
+
+	/////////////////////////////////////////////////
+	//richard set scale
+	if ( scalePet > 0.0f ) 
+	{ 
+		critter->SetObjectScale(scalePet);  
+	}
+	if ( petlevel > 0 ) 
+	{
+		critter->SetLevel(petlevel);
+	}
+	/////////////////////////////////////////////////
+
+
+
+
+
 
     m_caster->SetMiniPet(critter);
 
@@ -6670,6 +6809,8 @@ bool Spell::DoSummonPet(SpellEffectIndex eff_idx)
         return false;
 
     uint32 pet_entry = m_spellInfo->EffectMiscValue[eff_idx];
+
+
     CreatureInfo const* cInfo = ObjectMgr::GetCreatureTemplate(pet_entry);
     if (!cInfo)
     {

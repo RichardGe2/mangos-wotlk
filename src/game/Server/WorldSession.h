@@ -492,6 +492,9 @@ class WorldSession
         void HandleRepopRequestOpcode(WorldPacket& recvPacket);
         void HandleAutostoreLootItemOpcode(WorldPacket& recvPacket);
         void HandleLootMoneyOpcode(WorldPacket& recvPacket);
+
+		bool RichaHandleLootRandom(Loot* loot, int lootTypeItemOrGold);
+
         void HandleLootOpcode(WorldPacket& recvPacket);
         void HandleLootReleaseOpcode(WorldPacket& recvPacket);
         void HandleLootMasterGiveOpcode(WorldPacket& recvPacket);
@@ -965,6 +968,82 @@ class WorldSession
 
         std::mutex m_recvQueueLock;
         std::deque<std::unique_ptr<WorldPacket>> m_recvQueue;
+
+
+
+
+
+
+
+
+
+
+
+	////////////////////////////////////////////////////////////////////////////////////////////////
+	// richard 
+
+	class RICHARD_TRY_LOOT_WANT_NB
+	{
+	public:
+		RICHARD_TRY_LOOT_WANT_NB() { nbFois = 0; scoreDice = -1; }
+	
+		int nbFois; // sert juste pour le debug - incremente a chaque fois que le joueur envoie sa candidature
+
+		// le dé est lancé entre 2 et 1000.
+		// plus le score est eleve, plus le joueur a de chance d avoir le loot.
+		// qq scores spéciaux :
+		// -1 : pas init
+		// 0  : le joueur ne veut PAS le loot ( il a fait un OKWIN )
+		// 1  : le joueur arrivé en retard ( mais il veut quand meme le loot )
+		// 2 -> 1000 : cas normal
+		int scoreDice;
+	};
+
+
+	public:
+	class RICHARD_TRY_LOOT_WANT
+	{
+	public:
+		RICHARD_TRY_LOOT_WANT() 
+		{ 
+			winner = nullptr; 
+			//winnerSaidIWinAlone = false;
+			messageSentToPlayer_po = false;
+			messageSentToPlayer_loot = false;
+
+			okWinDoneOnThisLoot = false;
+		}
+
+		//liste des candidats pour ce loot - avec leur score de dès
+		std::map<Player * ,  RICHARD_TRY_LOOT_WANT_NB >  list;
+
+		Player * winner;
+
+		//bool winnerSaidIWinAlone;
+
+		bool messageSentToPlayer_po;
+		bool messageSentToPlayer_loot;
+
+		bool okWinDoneOnThisLoot;
+		
+	};
+
+	
+
+	public: static std::map<time_t  , RICHARD_TRY_LOOT_WANT  > g_wantLoot ;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
+
+
+
 };
 #endif
 /// @}

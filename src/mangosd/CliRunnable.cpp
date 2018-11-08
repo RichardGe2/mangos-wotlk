@@ -437,6 +437,118 @@ bool ChatHandler::HandleCharacterEraseCommand(char* args)
     return true;
 }
 
+
+
+
+bool ChatHandler::HandleRichardCommand_Quit(char* args)
+{
+	 // temps en seconde
+	//optionel : si je tappe juste : exi, par defaut ca sera 1 seconde
+	uint32 delay = 1;
+	
+
+	if (!ExtractUInt32(&args, delay))
+	{
+		delay = 1;
+	   // return false;
+	}
+
+	uint32 exitcode;
+	if (!ExtractOptUInt32(&args, exitcode, SHUTDOWN_EXIT_CODE))
+		return false;
+
+	// Exit code should be in range of 0-125, 126-255 is used
+	// in many shells for their own return codes and code > 255
+	// is not supported in many others
+	if (exitcode > 125)
+		return false;
+
+	sWorld.ShutdownServ(delay, 0, exitcode);
+	return true;
+}
+
+bool ChatHandler::HandleRichardCommand_clearLootWinners(char* args)
+{
+
+	if ( !m_session )
+	{
+		return false;
+	}
+
+	Player* playerEnterMessage = m_session->GetPlayer();
+
+	if ( !playerEnterMessage )
+	{
+		return false;
+	}
+	
+	int nbModifie1 = 0;
+	int nbModifie2 = 0;
+	int nbLoot = 0;
+	for(auto &ent : WorldSession::g_wantLoot )
+	{
+
+		
+		if ( ent.second.winner == playerEnterMessage ) // si le winner est le joueur qui a fait le OKWIN
+		{
+			ent.second.winner = nullptr; // on efface le winner de ce loot
+			ent.second.list.clear(); // on efface la liste des candidats pour ce loot
+			ent.second.messageSentToPlayer_loot = false;
+			ent.second.messageSentToPlayer_po = false;
+			ent.second.okWinDoneOnThisLoot = true; // on signal qu'un OKWIN a été fait sur ce loot
+			nbModifie1++;
+
+			// on cree une candidature pour l'objet - pour eviter de bloquer les resultat d'election en attendant tous les candidats ou la fin du timing
+			ent.second.list[playerEnterMessage].nbFois = 1;
+			ent.second.list[playerEnterMessage].scoreDice = 0; // score 0 veut dire que le joueur ne veut PAS le loot
+		}
+		else
+		{
+
+			//si l'election est toujours en cours : gagnant non décidé
+			//alors si le joueur a participé, on remplace son score par un score de 0
+			//si je joueur n'a pas participé, on insert un candidature avec score 0
+			if ( ent.second.winner == nullptr ) // si election en cours
+			{
+				if ( ent.second.list.find(playerEnterMessage) != ent.second.list.end() ) // si on trouve une candidature du joueur
+				{
+					ent.second.list[playerEnterMessage].scoreDice = 0; // on la remplace avec 0
+				}
+				else
+				{
+					// on cree une candidature pour l'objet - pour eviter de bloquer les resultat d'election en attendant tous les candidats ou la fin du timing
+					ent.second.list[playerEnterMessage].nbFois = 1;
+					ent.second.list[playerEnterMessage].scoreDice = 0; // score 0 veut dire que le joueur ne veut PAS le loot
+				}
+				ent.second.okWinDoneOnThisLoot = true; // on signal qu'un OKWIN a été fait sur ce loot
+				nbModifie2++;
+			}
+
+		}
+
+
+
+		//egalement, pour toutes les elections ou je ne me suis pas présenté
+
+		nbLoot++; // nb total de loot
+
+	}
+
+	char messageee[2048];
+	sprintf(messageee, "RICHAR: %s a clean ses %d/%d loots.", playerEnterMessage->GetName(),     nbModifie1  + nbModifie2    , nbLoot );
+
+	BASIC_LOG(messageee);
+	PSendSysMessage(messageee);
+
+	return true;
+}
+
+
+
+
+
+
+
 /// Close RA connection
 bool ChatHandler::HandleQuitCommand(char* /*args*/)
 {
