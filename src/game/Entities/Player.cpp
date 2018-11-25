@@ -17508,6 +17508,7 @@ void Player::RewardQuest(Quest const* pQuest, uint32 reward, Object* questGiver,
 
 		int currentParagonLvl = GetParagonLevelFromItem();
 
+		const int spellParagonIDBase = 94000; // <-- attention : pas le meme ID entre CLASSIC et WOTLK
 
 		//bool paragonPasse = false;
 		//for(int i=1; i<100; i++)
@@ -17563,14 +17564,14 @@ void Player::RewardQuest(Quest const* pQuest, uint32 reward, Object* questGiver,
 						}
 
 						// spell Paragon Up
-						if (SpellEntry const* spellProto = sSpellTemplate.LookupEntry<SpellEntry>(34000))
+						if (SpellEntry const* spellProto = sSpellTemplate.LookupEntry<SpellEntry>(spellParagonIDBase))
 						{
 							CastSpell(this, spellProto, TRIGGERED_OLD_TRIGGERED);
 						}
 
 
 						//on retire le spell du paragon precedent pour pas que le joueur stack les paragon
-						RemoveAurasDueToSpellByCancel(34000 + currentParagonLvl);
+						RemoveAurasDueToSpellByCancel(spellParagonIDBase + currentParagonLvl);
 
 
 
@@ -17658,7 +17659,7 @@ void Player::RewardQuest(Quest const* pQuest, uint32 reward, Object* questGiver,
 				}
 
 				// spell Paragon Up
-				if (SpellEntry const* spellProto = sSpellTemplate.LookupEntry<SpellEntry>(34000))
+				if (SpellEntry const* spellProto = sSpellTemplate.LookupEntry<SpellEntry>(spellParagonIDBase))
 				{
 					CastSpell(this, spellProto, TRIGGERED_OLD_TRIGGERED);
 				}

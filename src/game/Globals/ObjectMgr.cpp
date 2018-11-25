@@ -7733,6 +7733,14 @@ bool isValidString(const std::wstring& wstr, uint32 strictMask, bool numericOrSp
 
 uint8 ObjectMgr::CheckPlayerName(const std::string& name, bool create)
 {
+
+	
+	// RICHARD :  autoriser tous les noms de joueur
+	return CHAR_NAME_SUCCESS;
+
+
+
+
     std::wstring wname;
     if (!Utf8toWStr(name, wname))
         return CHAR_NAME_INVALID_CHARACTER;
