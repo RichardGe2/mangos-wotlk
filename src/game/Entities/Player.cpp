@@ -2950,7 +2950,7 @@ void Player::richa_exportTo_ristat_()
 		sprintf(outt, "\r\n#GUILD =================================\r\n");
 		fwrite(outt, 1, strlen(outt), fout);
 
-		ObjectGuid playerguid = GetGUID();
+		ObjectGuid playerguid = GetObjectGuid();
 
 		uint32 guildId = GetGuildIdFromDB(playerguid);
 		sprintf(outt, "guildid,%d\r\n", guildId);
