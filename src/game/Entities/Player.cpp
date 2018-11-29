@@ -772,6 +772,8 @@ void Player::richa_exportTo_richaracter_(
 			const char* characterName
 			)
 {
+	const int richa_language = 2;  // 0 pour US  -  2 pour FR  - langue de client utilisé pour extraire les bases de données
+
 	char outt[4096];
 
 	time_t t = time(0);   // get time now
@@ -878,7 +880,7 @@ void Player::richa_exportTo_richaracter_(
 		//AreaTableEntry const* zoneEntry = GetAreaEntryByAreaID(zone_id);
 		AreaTableEntry const* areaEntry = GetAreaEntryByAreaID(  richa_ListeMaison[i].areaid  );
 
-		sprintf(outt, "%d,%d,%s\r\n", richa_ListeMaison[i].mapid , richa_ListeMaison[i].areaid , areaEntry ? areaEntry->area_name[0] : "unknown");
+		sprintf(outt, "%d,%d,%s\r\n", richa_ListeMaison[i].mapid , richa_ListeMaison[i].areaid , areaEntry ? areaEntry->area_name[richa_language] : "unknown");
 		fwrite(outt, 1, strlen(outt), fcustom);
 	}
 
@@ -1420,6 +1422,9 @@ int Player::GetParagonLevelFromItem()
 
 void Player::richa_exportTo_ristat_()
 {
+	const int richa_language = GetSession()->GetSessionDbcLocale();  // 0 pour US  -  2 pour FR  - langue de client utilisé pour extraire les bases de données
+
+
 	time_t t = time(0);   // get time now
 	struct tm * now = localtime(&t);
 
@@ -1556,11 +1561,11 @@ void Player::richa_exportTo_ristat_()
 		fwrite(outt, 1, strlen(outt), fout);
 		sprintf(outt, "GPS_areaID,%d\r\n", area_id);
 		fwrite(outt, 1, strlen(outt), fout);
-		sprintf(outt, "GPS_mapEntry,\"%s\"\r\n",  mapEntry ? mapEntry->name[0] : "<unknown>" );
+		sprintf(outt, "GPS_mapEntry,\"%s\"\r\n",  mapEntry ? mapEntry->name[richa_language] : "<unknown>" );
 		fwrite(outt, 1, strlen(outt), fout);
-		sprintf(outt, "GPS_zoneEntry,\"%s\"\r\n",  zoneEntry ? zoneEntry->area_name[0] : "<unknown>" );
+		sprintf(outt, "GPS_zoneEntry,\"%s\"\r\n",  zoneEntry ? zoneEntry->area_name[richa_language] : "<unknown>" );
 		fwrite(outt, 1, strlen(outt), fout);
-		sprintf(outt, "GPS_areaEntry,\"%s\"\r\n",  areaEntry ? areaEntry->area_name[0] : "<unknown>" );
+		sprintf(outt, "GPS_areaEntry,\"%s\"\r\n",  areaEntry ? areaEntry->area_name[richa_language] : "<unknown>" );
 		fwrite(outt, 1, strlen(outt), fout);
 
 	}
@@ -1952,7 +1957,7 @@ void Player::richa_exportTo_ristat_()
 
 		sprintf(outt, "%d,\"%s\",%d,0x%llx,%s\r\n",
 			itr->first,
-			spellInfo->SpellName[loc],
+			spellInfo->SpellName[0], // la il faut rester sur SpellName[0] car cette database vient du server, et pas des FBC, donc c'est anglais only
 			spellInfo->Category,
 			spellInfo->SpellFamilyFlags,
 			effectName.c_str()  // ...
@@ -2353,7 +2358,7 @@ void Player::richa_exportTo_ristat_()
 
 		FactionEntry const* factionEntry = sFactionStore.LookupEntry(faction_2.ID);
 
-		std::string nameeeee = std::string(factionEntry->name[0]);
+		std::string nameeeee = std::string(factionEntry->name[richa_language]);
 
 		std::string rank_str = "??rank inconnu??";
 
@@ -2797,7 +2802,7 @@ void Player::richa_exportTo_ristat_()
 			//AreaTableEntry const* zoneEntry = GetAreaEntryByAreaID(zone_id);
 			AreaTableEntry const* areaEntry = GetAreaEntryByAreaID(m_richa_ListeMaison[i].areaid);
 
-			sprintf(outt, "%d,%d,%s\r\n", m_richa_ListeMaison[i].mapid , m_richa_ListeMaison[i].areaid ,  areaEntry ? areaEntry->area_name[0] : "unknown");
+			sprintf(outt, "%d,%d,%s\r\n", m_richa_ListeMaison[i].mapid , m_richa_ListeMaison[i].areaid ,  areaEntry ? areaEntry->area_name[richa_language] : "unknown");
 			fwrite(outt, 1, strlen(outt), fout);
 		}
 
@@ -2829,7 +2834,7 @@ void Player::richa_exportTo_ristat_()
 			if (const MapEntry* entry = sMapStore.LookupEntry(itr->first))
 			{
 				sprintf(outt, "map: %d (%s) inst: %d perm: %s canReset: %s TTR: %s\r\n",
-								itr->first, entry->name[0], state->GetInstanceId(), itr->second.perm ? "yes" : "no",
+								itr->first, entry->name[richa_language], state->GetInstanceId(), itr->second.perm ? "yes" : "no",
 								state->CanReset() ? "yes" : "no", timeleft.c_str());
 				fwrite(outt, 1, strlen(outt), fout);
 			}
@@ -2857,7 +2862,7 @@ void Player::richa_exportTo_ristat_()
 				if (const MapEntry* entry = sMapStore.LookupEntry(itr->first))
 				{
 					sprintf(outt, "map: %d (%s) inst: %d perm: %s canReset: %s TTR: %s\r\n",
-									itr->first, entry->name[0], state->GetInstanceId(), itr->second.perm ? "yes" : "no",
+									itr->first, entry->name[richa_language], state->GetInstanceId(), itr->second.perm ? "yes" : "no",
 									state->CanReset() ? "yes" : "no", timeleft.c_str());
 					fwrite(outt, 1, strlen(outt), fout);
 				}

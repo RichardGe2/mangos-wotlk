@@ -1538,10 +1538,9 @@ bool Loot::FillLoot(uint32 loot_id, LootStore const& store, Player* lootOwner, b
 		//on va ajuster le score to reach en fonction du paragon
 		//cette regle ne marchera QUE pour reduire, pas pour augmenter.
 		//un joueur paragon 1 qui s'attaque a un mob fait pour 2 joueurs  aura autant de moins de chance 
-		//en gros ce IF ne va concerner que les joueur 60 avec un paragon > 1
+		//en gros ce IF ne va concerner que les paragon > 1
 		if ( 
-			playerlevel >= 60
-			&& playerParagon > 1 // si je joueur est paragon assez haut pour devoir etre geré autrement
+			playerParagon > 1 // si je joueur est paragon assez haut pour devoir etre geré autrement
 			) 
 		{
 
@@ -2563,8 +2562,11 @@ Loot::Loot(Player* player, Creature* creature, LootType type) :
 					float newMax = (float)creatureInfo->MaxLootGold;
 
 					// 1) deja, on multiplie par la difficulté du perso :
-					newMin *= creature->Richar_difficuly_health;
-					newMax *= creature->Richar_difficuly_health;
+					if ( creature->Richar_difficuly_health > 0.0f )
+					{
+						newMin *= creature->Richar_difficuly_health;
+						newMax *= creature->Richar_difficuly_health;
+					}
 
 					// 2) et en plus de ca, on va rajouter une sécurite, car les gros boss de raid lootent de base
 					//plusieurs centaines de PO.

@@ -144,6 +144,15 @@ Creature::Creature(CreatureSubtype subtype) : Unit(),
     m_isInvisible(false), m_ignoreMMAP(false), m_forceAttackingCapability(false), m_ignoreRangedTargets(false), m_countSpawns(false),
     m_creatureInfo(nullptr)
 {
+
+
+
+	Richar_difficuly_health = -1.0f;
+
+
+
+
+
     m_regenTimer = 200;
     m_valuesCount = UNIT_END;
 
@@ -1315,8 +1324,14 @@ void Creature::SelectLevel(uint32 forcedLevel /*= USE_DEFAULT_DATABASE_LEVEL*/)
         }
     }
 
-    health *= _GetHealthMod(  m_richar_lieuOrigin,GetName(),GetOwner(),      rank); // Apply custom config settting
-    if (health < 1)
+    Richar_difficuly_health = _GetHealthMod(  m_richar_lieuOrigin,GetName(),GetOwner(),      rank); // Apply custom config settting
+    health *= Richar_difficuly_health;
+	
+	
+	
+	
+	
+	if (health < 1)
         health = 1;
 
     //////////////////////////////////////////////////////////////////////////
@@ -1782,6 +1797,9 @@ float Creature::GetRichardModForMap(const std::string& cPosRicha, const std::str
 
 	if (    cPosRicha != "Eastern Kingdoms"
 		&&  cPosRicha != "Kalimdor"
+		&&  cPosRicha != "Royaumes de l'est" // WOTLK server a les regions en FR
+		&&  cPosRicha != "Norfendre" 
+		&&  cPosRicha != "Outreterre"
 		&& !messageSaidDungeaon) 
 	{ 
 		messageSaidDungeaon=true;  
