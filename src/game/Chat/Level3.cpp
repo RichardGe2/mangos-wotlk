@@ -4360,7 +4360,7 @@ bool ChatHandler::Richar_listeventquest(char* /*args*/)
 
 	//on peut lister :
 	std::ofstream myfile;
-	myfile.open ("RICHARDS/___OUT_listeventquest_ASUP.txt");
+	myfile.open ("RICHARDS_WOTLK/___OUT_listeventquest_ASUP.txt");
 	myfile <<"## START -----------------";
 	for (const auto& elem1 : event_MERGED_quest)
 	{

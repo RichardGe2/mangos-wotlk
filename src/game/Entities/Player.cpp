@@ -786,7 +786,7 @@ void Player::richa_exportTo_richaracter_(
 	//uint64 guid = guiiddd.GetRawValue();
 
 	char nameFile2[2048];
-	sprintf(nameFile2, "RICHARDS/_ri_character_%d.txt",guid);
+	sprintf(nameFile2, "RICHARDS_WOTLK/_ri_character_%d.txt",guid);
 	FILE* fcustom = fopen(nameFile2, "wb"); // w : create an empty file - if file already exist content are discarded , and treated as new empty file
 	
 
@@ -913,7 +913,7 @@ void Player::richa_importFrom_richaracter_(uint64 guid__,
 	
 	char nameFile2[2048];
 	//const char* playerName = GetName();
-	sprintf(nameFile2, "RICHARDS/_ri_character_%d.txt",guid__);
+	sprintf(nameFile2, "RICHARDS_WOTLK/_ri_character_%d.txt",guid__);
 
 	std::ifstream infile(nameFile2);
 
@@ -1257,7 +1257,7 @@ void Player::richard_importVariables_START(uint64 guid__)
 			int fromFile_paragoProgress = 0;
 
 			char nameFile2[2048];
-			sprintf(nameFile2, "RICHARDS/_ri_human_%s.txt",irlName);
+			sprintf(nameFile2, "RICHARDS_WOTLK/_ri_human_%s.txt",irlName);
 
 
 			{
@@ -1436,7 +1436,7 @@ void Player::richa_exportTo_ristat_()
 
 	char nameFile[2048];
 	const char* playerName = GetName();
-	sprintf(nameFile, "RICHARDS/_ri_stat_%s_%d_%02d_%02d.txt",
+	sprintf(nameFile, "RICHARDS_WOTLK/_ri_stat_%s_%d_%02d_%02d.txt",
 		playerName,
 		now->tm_year + 1900,
 		now->tm_mon+1,
@@ -3021,7 +3021,7 @@ void Player::richa_exportTo_ristat_()
 	// pour faciliter le debug, je vais copier coller le fichier quotidien dans des fichiers qui vont tout garder
 	// du coup je pourrai me permettre de regulierement effacer l'interieur du dossier TEMP qui va grossir vite
 	char nameFile2[2048];
-	sprintf(nameFile2, "RICHARDS/TEMP/_ri_stat_%s_%d_%02d_%02d_%02d_%02d_%02d.txt",
+	sprintf(nameFile2, "RICHARDS_WOTLK/TEMP/_ri_stat_%s_%d_%02d_%02d_%02d_%02d_%02d.txt",
 		playerName,
 		now->tm_year + 1900,
 		now->tm_mon+1,
@@ -3046,7 +3046,7 @@ void Player::richa_exportTo_ristat_()
 		//en fait je me demande si c'est pas juste si par hasard je me deco a la meme seconde du save auto.
 		//du coup ca va fail car meme file name
 		//du coup je regenere un nouveau nom, avec +1 seconde
-		sprintf(nameFile2, "RICHARDS/TEMP/_ri_stat_%s_%d_%02d_%02d_%02d_%02d_%02d.txt",
+		sprintf(nameFile2, "RICHARDS_WOTLK/TEMP/_ri_stat_%s_%d_%02d_%02d_%02d_%02d_%02d.txt",
 		playerName,
 		now->tm_year + 1900,
 		now->tm_mon+1,
@@ -3135,7 +3135,7 @@ void Player::richard_saveToLog()
 
 
 			char nameFile2[2048];
-			sprintf(nameFile2, "RICHARDS/_ri_human_%s.txt",irlName);
+			sprintf(nameFile2, "RICHARDS_WOTLK/_ri_human_%s.txt",irlName);
 
 			//Deja, avant de supprimer le fichier, on regarde les anciennes valeurs
 			{
@@ -3223,7 +3223,7 @@ void Player::richard_saveToLog()
 
 
 			//char nameFile2[2048];
-			//sprintf(nameFile2, "RICHARDS/_ri_human_%s.txt",irlName);
+			//sprintf(nameFile2, "RICHARDS_WOTLK/_ri_human_%s.txt",irlName);
 			FILE* fcustom = fopen(nameFile2, "wb");
 			
 			sprintf(outt, "HUMAIN_STAT\r\n"); // juste un code pour savoir si tout est ok
@@ -16521,6 +16521,7 @@ bool Player::CanTakeQuest(Quest const* pQuest, bool msg) const
 			bool b9 = SatisfyQuestNextChain(pQuest, msg);
 			bool ba = SatisfyQuestPrevChain(pQuest, msg);
 			bool bb = pQuest->IsActive();
+			bool bc = SatisfyQuestCondition(pQuest, msg);
 
 
 
@@ -16538,7 +16539,28 @@ bool Player::CanTakeQuest(Quest const* pQuest, bool msg) const
 			//BASIC_LOG("RICHAR: %s can t take quest %d because :", GetName(), pQuest->GetQuestId());
 		
 		
-			if (!b2) { finalMessage += std::string("-- SatisfyQuestClass"); }
+			if (!b2) 
+			{
+				uint32 reqClass = pQuest->GetRequiredClasses();
+				finalMessage += std::string("-- SatisfyQuestClass, class="); 
+				finalMessage += std::to_string(reqClass);
+				finalMessage += std::string("->"); 
+
+				//c'est un masque, donc ca peut concerner plusieur class
+				if ( ( reqClass & ( 1 << (CLASS_MAGE - 1) ) ) != 0   )  {finalMessage += std::string("MAGE,"); }
+				if ( ( reqClass & ( 1 << (CLASS_PALADIN - 1) ) ) != 0   )  {finalMessage += std::string("PALADIN,"); }
+				if ( ( reqClass & ( 1 << (CLASS_WARRIOR - 1) ))  != 0   )  {finalMessage += std::string("WARRIOR,"); }
+				if ( ( reqClass & ( 1 << (CLASS_HUNTER - 1) ) ) != 0   )  {finalMessage += std::string("HUNTER,"); }
+				if ( ( reqClass & ( 1 << (CLASS_ROGUE - 1) ) ) != 0   )  {finalMessage += std::string("ROGUE,"); }
+				if ( ( reqClass & ( 1 << (CLASS_PRIEST - 1) ) ) != 0   )  {finalMessage += std::string("PRIEST,"); }
+				if ( ( reqClass & ( 1 << (CLASS_SHAMAN - 1) ) ) != 0   )  {finalMessage += std::string("SHAMAN,"); }
+				if ( ( reqClass & ( 1 << (CLASS_WARLOCK - 1) ) ) != 0   )  {finalMessage += std::string("WARLOCK,"); }
+				if ( ( reqClass & ( 1 << (CLASS_DRUID - 1) ) ) != 0   )  {finalMessage += std::string("DRUID,"); }
+				if ( ( reqClass & ( 1 << (CLASS_DEATH_KNIGHT - 1) ) ) != 0   )  {finalMessage += std::string("DEATH_KNIGHT,"); }
+				
+
+
+			}
 			else if (!b3) { finalMessage += std::string("-- SatisfyQuestRace"); }
 			else if (!b4) 
 			{ 
@@ -16658,6 +16680,19 @@ bool Player::CanTakeQuest(Quest const* pQuest, bool msg) const
 			else if (!b9) { finalMessage += std::string("-- SatisfyQuestNextChain"); }
 			else if (!ba) { finalMessage += std::string("-- SatisfyQuestPrevChain"); }
 			else if (!bb) { finalMessage += std::string("-- IsActive"); }
+
+			else if ( !bc )
+			{
+				uint32 conditionId = pQuest->GetRequiredCondition();
+				const PlayerCondition* condition = sConditionStorage.LookupEntry<PlayerCondition>(conditionId);
+				if ( condition )
+				{
+					// todo : afficher le message qui est dans  la databse :  condition.comments.  ca peut pas mal aider
+				}
+				finalMessage += std::string("-- SatisfyQuestCondition - conditionID="); 
+				finalMessage += std::to_string(conditionId);
+			}
+
 			else 
 			{
 				finalMessage += std::string("-- ERROR UNKONWN REASON ??????????????");

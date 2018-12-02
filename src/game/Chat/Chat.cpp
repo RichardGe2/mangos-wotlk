@@ -2097,7 +2097,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 		for(;;)
 		{
 
-			sprintf(nameFile, "RICHARDS/_ri_stat_%s_%d_%02d_%02d.txt",
+			sprintf(nameFile, "RICHARDS_WOTLK/_ri_stat_%s_%d_%02d_%02d.txt",
 				nameToSearch.c_str(),
 				yea,
 				mon,
