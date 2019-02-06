@@ -542,6 +542,7 @@ void WorldSession::HandlePageTextQueryOpcode(WorldPacket& recv_data)
 				std::vector<Player::RICHA_PAGE_DISCO_STAT> richa_pageDiscovered;
 				std::vector<Player::RICHA_LUNARFESTIVAL_ELDERFOUND> richa_lunerFestivalElderFound;
 				std::vector<Player::RICHA_MAISON_TAVERN> richa_maisontavern;
+				std::vector<Player::RICHA_ITEM_LOOT_QUEST> richa_lootquest;
 				std::string persoName;
 				Player::richa_importFrom_richaracter_(
 					associatedPlayerGUID[i],
@@ -549,6 +550,7 @@ void WorldSession::HandlePageTextQueryOpcode(WorldPacket& recv_data)
 					richa_pageDiscovered,
 					richa_lunerFestivalElderFound,
 					richa_maisontavern,
+					richa_lootquest,
 					persoName
 					);
 
@@ -603,7 +605,7 @@ void WorldSession::HandlePageTextQueryOpcode(WorldPacket& recv_data)
 		{
 			if ( comesFromObject ) // dans le succes, on compte QUE les 111 textes qui viennet d'un object et PAS d'un item
 			{
-				char messageOut[256];
+				char messageOut[4096];
 				sprintf(messageOut, "Texte deja connu par ce Perso.");
 				_player->Say(messageOut, LANG_UNIVERSAL);
 			}

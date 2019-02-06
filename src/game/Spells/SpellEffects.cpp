@@ -6456,7 +6456,7 @@ bool Spell::DoSummonCritter(CreatureSummonPositions& list, SummonPropertiesEntry
 				Pet* old_critter = player->GetMiniPet();
 				if (!old_critter )
 				{
-					char messageOut[256];
+					char messageOut[4096];
 					sprintf(messageOut, "Youhaimon GO !");
 					player->Say(messageOut, LANG_UNIVERSAL);
 				}
@@ -6467,7 +6467,7 @@ bool Spell::DoSummonCritter(CreatureSummonPositions& list, SummonPropertiesEntry
 			else
 			{
 			
-				char messageOut[256];
+				char messageOut[4096];
 				sprintf(messageOut, "Pas de youhaimon");
 				player->Say(messageOut, LANG_UNIVERSAL);
 
