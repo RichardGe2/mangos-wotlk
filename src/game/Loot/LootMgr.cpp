@@ -1219,18 +1219,85 @@ bool Loot::FillLoot(uint32 loot_id, LootStore const& store, Player* lootOwner, b
 			{
 				itemEnLootCommun = (itemProto->Flags & ITEM_FLAG_MULTI_DROP) != 0;
 			}
-			itemEnLootCommun = LootItem::Richard_lootCommunPourObjDeQuest(iItemNeed.first) ? true : itemEnLootCommun;
+			
+
+			// j'ai remarqué que  Richard_lootCommunPourObjDeQuest est assez lent.  si listItemThatPlayersNeed  a genre > 10 objets , ca peut creer un mini lag
+			// a 30 objets on voit un vrai bloquage de > 1 seconde
+			// donc pour resoudre ca, je fais un petit static moche ici, pour ne chercher que une seule fois.
+			static std::map<uint32_t,bool> lootCommunForceParRichard;
+			auto& ittt = lootCommunForceParRichard.find(iItemNeed.first);
+			if ( ittt == lootCommunForceParRichard.end() )
+			{
+				lootCommunForceParRichard[iItemNeed.first] = LootItem::Richard_lootCommunPourObjDeQuest(iItemNeed.first);
+				ittt = lootCommunForceParRichard.find(iItemNeed.first);
+			}
+			
+
+
+			itemEnLootCommun = ittt->second ? true : itemEnLootCommun;
+
+
+
 
 			std::string gagantDebug = "";
 
-			//si on est en mode gentil et que l'objet est tombé, alors on reset la quete de tout ceux qui etaient sur cette item
+			//pour chaque item, on ne choisi que 1 seul joueur a incrémenter le score
+			//sauf si objet en loot commun, dans ce cas on donne les points toujours au meme joueur.
+			//voir diapo dans H: ou je parle plus préciséments des regle de ces quetes.
+			//
+			//
+			//si item en loot commun, et plusieurs joueurs sont sur la quete, alors on donne toujours au meme joueur
+			//ceci va garantir que si un item a 10% de chance de tomber, alors il tombera pour tout le monde au bout de 10 kill
+			uint32 indexPlayerChosen = 0;
+			if ( itemEnLootCommun && iItemNeed.second.playerNeedThisItem.size() > 1 )
+			{
+				// on va dire par exemple qu'on donne toujours au joueur avec le plus petit GUID
+				uint32 lowerGUID = 0xFFffFFff;
+				int playerIndexChoosen = -1;
+				for(int i=0; i<iItemNeed.second.playerNeedThisItem.size(); i++)
+				{
+					uint32 guidd = iItemNeed.second.playerNeedThisItem[i]->GetGUIDLow();
+					if ( guidd < lowerGUID )
+					{
+						playerIndexChoosen = i;
+						lowerGUID = guidd;
+					}
+				}
+				indexPlayerChosen = playerIndexChoosen;
+			}
+			else
+			{
+				indexPlayerChosen = uint32(urand(      0      ,  iItemNeed.second.playerNeedThisItem.size()-1 )  );
+			}
+			Player* winner = iItemNeed.second.playerNeedThisItem[indexPlayerChosen];
+			Player::RICHA_ITEM_LOOT_QUEST& quest = winner->m_richa_itemLootQuests[ iItemNeed.second.playerNeedThisItem_indexQuest[indexPlayerChosen] ];
+
+			std::string itemName = "objet inconnu";
+			//ItemPrototype const* itemProto = sItemStorage.LookupEntry<ItemPrototype>(  iItemNeed.first  );
+			if ( itemProto )
+			{
+				itemName = std::string(itemProto->Name1);
+			}
+
+			iItemNeed.second.statisqueDropOfThisItemOnCurrentNPC = (float)iItemNeed.second.nbFound / (float)nbTry;
+
+			//si on est en mode gentil et que l'objet est tombé, alors on reset la quete 
+
+
 			if ( mode_itemCanLoot && iItemNeed.second.itemDropOnThisLoot )
 			{
 				//for each player on this item quest
-				for(int iPLayer=0; iPLayer<iItemNeed.second.playerNeedThisItem.size(); iPLayer++)
+				//for(int iPLayer=0; iPLayer<iItemNeed.second.playerNeedThisItem.size(); iPLayer++)
+				//
+				// en fait on va etre encore plus gentil, et on va reset uniquement la quete de un joueur choisi au hasard.
+				// ce joueur sera celui qui remporte ce loot
+
 				{
-					Player* playy = iItemNeed.second.playerNeedThisItem[iPLayer];
-					Player::RICHA_ITEM_LOOT_QUEST& quest = playy->m_richa_itemLootQuests[ iItemNeed.second.playerNeedThisItem_indexQuest[iPLayer] ];
+					//Player* playy = iItemNeed.second.playerNeedThisItem[iPLayer];
+					Player* playy = winner;
+
+
+					//Player::RICHA_ITEM_LOOT_QUEST& quest = playy->m_richa_itemLootQuests[ iItemNeed.second.playerNeedThisItem_indexQuest[iPLayer] ];
 
 
 					//
@@ -1256,66 +1323,30 @@ bool Loot::FillLoot(uint32 loot_id, LootStore const& store, Player* lootOwner, b
 					}
 
 				
-					std::string itemName = "objet inconnu";
-					if ( itemProto )
-					{
-						itemName = std::string(itemProto->Name1);
-					}
-
-					//char messageJoueur[4096];
-					//sprintf(messageJoueur,"quete termin\xc3\xa9\e - %s est pour moi.",itemName.c_str());
-					//playy->Say(messageJoueur, LANG_UNIVERSAL);
-				
-					//gagantDebug = "Gagnant=";
-					//gagantDebug += std::string(winner->GetName());
+					
 
 
 
 
 				}
 
+				char messageJoueur[4096];
+				sprintf(messageJoueur,"quete termin\xc3\xa9\e avant la fin - %s est pour moi.",itemName.c_str());
+				winner->Say(messageJoueur, LANG_UNIVERSAL);
+
+
+
 				gagantDebug += "l'objet est tombe naturellement ";
 				gagantDebug += "on reset donc la quete de ";
-				gagantDebug += std::to_string( iItemNeed.second.playerNeedThisItem.size() );
-				gagantDebug += "joueurs.";
+				//gagantDebug += std::to_string( iItemNeed.second.playerNeedThisItem.size() );
+				//gagantDebug += "joueurs.";
+				gagantDebug += winner->GetName();
 
 			}
 			else
 			{
 
-				iItemNeed.second.statisqueDropOfThisItemOnCurrentNPC = (float)iItemNeed.second.nbFound / (float)nbTry;
-
-				//pour chaque item, on ne choisi que 1 seul joueur a incrémenter le score
-				//sauf si objet en loot commun, dans ce cas on donne les points toujours au meme joueur.
-				//voir diapo dans H: ou je parle plus préciséments des regle de ces quetes.
-
 				
-				//si item en loot commun, et plusieurs joueurs sont sur la quete, alors on donne toujours au meme joueur
-				//ceci va garantir que si un item a 10% de chance de tomber, alors il tombera pour tout le monde au bout de 10 kill
-				uint32 indexPlayerChosen = 0;
-				if ( itemEnLootCommun && iItemNeed.second.playerNeedThisItem.size() > 1 )
-				{
-					// on va dire par exemple qu'on donne toujours au joueur avec le plus petit GUID
-					uint32 lowerGUID = 0xFFffFFff;
-					int playerIndexChoosen = -1;
-					for(int i=0; i<iItemNeed.second.playerNeedThisItem.size(); i++)
-					{
-						uint32 guidd = iItemNeed.second.playerNeedThisItem[i]->GetGUIDLow();
-						if ( guidd < lowerGUID )
-						{
-							playerIndexChoosen = i;
-							lowerGUID = guidd;
-						}
-					}
-					indexPlayerChosen = playerIndexChoosen;
-				}
-				else
-				{
-					indexPlayerChosen = uint32(urand(      0      ,  iItemNeed.second.playerNeedThisItem.size()-1 )  );
-				}
-
-				Player* winner = iItemNeed.second.playerNeedThisItem[indexPlayerChosen];
-				Player::RICHA_ITEM_LOOT_QUEST& quest = winner->m_richa_itemLootQuests[ iItemNeed.second.playerNeedThisItem_indexQuest[indexPlayerChosen] ];
 				quest.currentScore += iItemNeed.second.statisqueDropOfThisItemOnCurrentNPC;
 				if ( quest.currentScore >= 1.0 ) // si le joueur termine sa quete
 				{
@@ -1348,12 +1379,6 @@ bool Loot::FillLoot(uint32 loot_id, LootStore const& store, Player* lootOwner, b
 
 				
 
-					std::string itemName = "objet inconnu";
-					//ItemPrototype const* itemProto = sItemStorage.LookupEntry<ItemPrototype>(  iItemNeed.first  );
-					if ( itemProto )
-					{
-						itemName = std::string(itemProto->Name1);
-					}
 
 					char messageJoueur[4096];
 					sprintf(messageJoueur,"quete termin\xc3\xa9\e - %s est pour moi.",itemName.c_str());
@@ -1371,10 +1396,16 @@ bool Loot::FillLoot(uint32 loot_id, LootStore const& store, Player* lootOwner, b
 
 			}
 
-			BASIC_LOG("RICHAR - ITEM QUEST : probability item=%d  :  %f/100  %s", 
-				iItemNeed.first ,
-				iItemNeed.second.statisqueDropOfThisItemOnCurrentNPC * 100.0f , 
-				gagantDebug.c_str());
+			if ( iItemNeed.second.statisqueDropOfThisItemOnCurrentNPC > 0.0f ) // on va affichier que les item que ce NPC peut looter
+			{
+				// si besoin : printf pour debug
+				BASIC_LOG("RICHAR - ITEM QUEST : probability item=%d  :  %f/100  %s", 
+					iItemNeed.first ,
+					iItemNeed.second.statisqueDropOfThisItemOnCurrentNPC * 100.0f , 
+					gagantDebug.c_str());
+			}
+
+
 		}
 
 
@@ -1587,6 +1618,7 @@ bool Loot::FillLoot(uint32 loot_id, LootStore const& store, Player* lootOwner, b
 					||  strcmp(nameGo , "Witch Doctor\'s Chest" ) == 0		||  strcmp(nameGo , "Coffre du sorcier-docteur" ) == 0 
 					||  strcmp(nameGo , "Large Battered Chest" ) == 0		||  strcmp(nameGo , "Grand coffre endommag\xc3\xa9" ) == 0 
 					||  strcmp(nameGo , "Tattered Chest" ) == 0				||  strcmp(nameGo , "Coffre en morceaux" ) == 0 
+					||  strcmp(nameGo , "Old Treasure Chest" ) == 0			||  strcmp(nameGo , "Vieux coffre au tr\xc3\xa9sor" ) == 0 
 						)
 					)
 				{
@@ -1910,7 +1942,7 @@ bool Loot::FillLoot(uint32 loot_id, LootStore const& store, Player* lootOwner, b
 
 		float difficultyDonjon = 0.0;
 
-		Creature::GetRichardModForMap(  creatureLooting->m_richar_lieuOrigin , creatureLooting->GetName(),  creatureLooting->GetOwner() , &difficultyDonjon, NULL  );
+		Creature::GetRichardModForMap(  creatureLooting->m_richar_lieuOrigin , creatureLooting->GetName(),  creatureLooting->GetOwner() , &difficultyDonjon, NULL , NULL );
 
 		int playerParagon = lootOwner->GetParagonLevelFromItem();
 		int playerlevel = lootOwner->getLevel();
@@ -3006,7 +3038,7 @@ Loot::Loot(Player* player, Creature* creature, LootType type) :
 				{
 					float difficultyDonjon = 0.0;
 					int nbPlayerThatShouldKillThisCreature = 1; // nombre original de joueurs équilibré par Blizzard
-					Creature::GetRichardModForMap(  creature->m_richar_lieuOrigin , creature->GetName(),  creature->GetOwner() , &difficultyDonjon, &nbPlayerThatShouldKillThisCreature  );
+					Creature::GetRichardModForMap(  creature->m_richar_lieuOrigin , creature->GetName(),  creature->GetOwner() , &difficultyDonjon, &nbPlayerThatShouldKillThisCreature, NULL  );
 
 
 

@@ -1231,6 +1231,7 @@ void Pet::InitStatsForLevel(uint32 petlevel)
 
     // Apply custom health setting (from config)
     Richar_difficuly_health = _GetHealthMod(        m_richar_lieuOrigin,GetName(),GetOwner(),                cInfo->Rank);
+	Richar_difficuly_degat = _GetDamageMod(m_richar_lieuOrigin,GetName(),GetOwner(),      cInfo->Rank);
 	health *= Richar_difficuly_health;
 
 
