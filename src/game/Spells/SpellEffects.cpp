@@ -6424,10 +6424,13 @@ bool Spell::DoSummonCritter(CreatureSummonPositions& list, SummonPropertiesEntry
 
 			if ( itemKeyRin0 > 0 && quantity > 0 )
 			{
+				bool isEpic = false;
+
 				pet_entry = itemKeyRin0 - 100000;
 
 				if ( pet_entry >  100000 ) // si c'est un pokemon epic
 				{
+					isEpic = true;
 					pet_entry -= 100000;
 				}
 
@@ -6447,7 +6450,8 @@ bool Spell::DoSummonCritter(CreatureSummonPositions& list, SummonPropertiesEntry
 
 
 				//ici, au cas par cas, on va gerer la scale des youhaimon :
-				if ( pet_entry == 3917 )  // youhaimon 203917 - Elementaire d'eau
+				// je trouve que tous les youhaimon epique sont trop gros : je prefere des youhaimon trop petit, et les ragrandir au cas par cas, plutot que tous les youhaimon trop gros
+				if ( isEpic ) 
 				{
 					scalePet *= 0.5f;
 				}

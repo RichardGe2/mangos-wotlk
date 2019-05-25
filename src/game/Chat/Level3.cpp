@@ -4437,9 +4437,7 @@ unsigned long Richa_NiceLinkToIitemID(const char* str)
 }
 
 
-//convert example :
-// 3965 -->  "|cff9d9d9d|Hitem:3965:0:0:0|h[Gants en cuir épais]|h|r"
-std::string Richa_itemIdToNiceLink(unsigned long itemID)
+std::string ChatHandler::Richa_itemIdToNiceLink(unsigned long itemID)
 {
 	std::string itemName = "objet inconnu";
 	std::string qualityStr = "9d9d9d";
@@ -4615,7 +4613,7 @@ bool ChatHandler::Richar_need(char* arg)
 					return true;
 				}
 
-				// delete  remove  stop  ... tout ca revient au meme
+				// delete  remove  stop  supprimer  suppr  ... tout ca revient au meme
 				else if ( strncmp( arg , "delete ", strlen("delete ") ) == 0 ) // si la chaine commence par:  delete
 				{
 					argumentPointer += strlen("delete ");
@@ -4634,6 +4632,20 @@ bool ChatHandler::Richar_need(char* arg)
 					modeDelete = true;
 					int a=0;
 				}
+
+				else if ( strncmp( arg , "supprimer ", strlen("supprimer ") ) == 0 ) // si la chaine commence par:  supprimer
+				{
+					argumentPointer += strlen("supprimer ");
+					modeDelete = true;
+					int a=0;
+				}
+				else if ( strncmp( arg , "suppr ", strlen("suppr ") ) == 0 ) // si la chaine commence par:  suppr
+				{
+					argumentPointer += strlen("suppr ");
+					modeDelete = true;
+					int a=0;
+				}
+
 
 				else if ( strncmp( arg , "boucle ", strlen("boucle ") ) == 0 ) 
 				{
@@ -4984,7 +4996,7 @@ bool ChatHandler::Richar_help(char* arg)
 			sprintf(messageee, "majuscul + click gauche sur item : avoir info sur item"  );
 			PSendSysMessage(messageee);
 
-			sprintf(messageee, "[q=aventure] : avoir info sur la quete 'Aventure'"  );
+			sprintf(messageee, "q=Aventure : avoir info sur la quete 'Aventure'"  );
 			PSendSysMessage(messageee);
 
 			sprintf(messageee, "namegospeicialricha :  sort d'invocation demoniste [CHEAT]"  );
@@ -5079,7 +5091,7 @@ bool ChatHandler::Richar_tellMobStats(char* /*args*/)
 			PSendSysMessage(messageee);
 
 
-			sprintf(messageee, "MaxHealth = %d", playerTarget->GetMaxHealth() );
+			sprintf(messageee, "Health = %d / %d"  , playerTarget->GetHealth() , playerTarget->GetMaxHealth() );
 			BASIC_LOG(messageee);
 			PSendSysMessage(messageee);
 

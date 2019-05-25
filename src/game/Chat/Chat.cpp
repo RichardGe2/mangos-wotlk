@@ -1321,30 +1321,31 @@ ChatCommandSearchResult ChatHandler::FindCommand(ChatCommand* table, char const*
 
 
 // example  [i=4536]
-void ChatHandler::ExecuteCommand_richard_B(const char* text)
+// return TRUE if taken in charge
+bool ChatHandler::ExecuteCommand_richard_B(const char* text)
 {
 	
 
 	if ( text == 0 )
 	{
-		return;
+		return false;
 	}
 
 	if ( text[0] == 0 )
 	{
-		return;
+		return false;
 	}
 
 	int lennn = strlen(text) ;
 	if ( lennn < 5 )
 	{
-		return;
+		return false;
 	}
 
 
 	if ( text[lennn-1] != ']' )
 	{
-		return;
+		return false;
 	}
 
 
@@ -1370,13 +1371,13 @@ void ChatHandler::ExecuteCommand_richard_B(const char* text)
 
 		int numberID = atoi(number);
 
-		ExecuteCommand_richard_2(numberID);
+		bool charggeee = ExecuteCommand_richard_2(numberID);
 
-
+		return charggeee;
 	}
 
 
-
+	return false;
 
 }
 
@@ -1417,31 +1418,32 @@ bool StrCmp_noCase(const char* a, const char* b)
 // example  [i=canine de lion des savanes]  
 //   ou     [i="canine de lion des savanes"]  
 // la casse n'est PAS prise en compte
-void ChatHandler::ExecuteCommand_richard_C(const char* text)
+// return TRUE if taken in charge
+bool ChatHandler::ExecuteCommand_richard_C(const char* text)
 {
 
 	int SIZE___ = 3;
 
 	if ( text == 0 )
 	{
-		return;
+		return false;
 	}
 
 	if ( text[0] == 0 )
 	{
-		return;
+		return false;
 	}
 
 	int lennn = strlen(text) ;
 	if ( lennn < SIZE___+2 )
 	{
-		return;
+		return false;
 	}
 
 
 	if ( text[lennn-1] != ']' )
 	{
-		return;
+		return false;
 	}
 
 
@@ -1449,10 +1451,11 @@ void ChatHandler::ExecuteCommand_richard_C(const char* text)
 	{
 		if ( text[lennn-2] != '\"' )
 		{
-			return;
+			return false;
 		}
 	}
 
+	bool takenInCharge = false;
 
 	if (    text[SIZE___-3] == '['
 		&&  text[SIZE___-2] == 'i'
@@ -1503,7 +1506,7 @@ void ChatHandler::ExecuteCommand_richard_C(const char* text)
 			if ( prototype && StrCmp_noCase ( prototype->Name1 , itemName ) )
 			{
 				objectFound = true;
-				ExecuteCommand_richard_2(itemID);
+				takenInCharge = ExecuteCommand_richard_2(itemID);
 				break;
 			}
 
@@ -1519,55 +1522,54 @@ void ChatHandler::ExecuteCommand_richard_C(const char* text)
 	}
 
 
-	return;
+	return takenInCharge;
 
 }
 
 
-// example  [q=L'impact]  
-//   ou     [q="L'impact"]  
+// example  q=L'impact
+//   ou     q="L'impact" 
 // la casse n'est PAS prise en compte
-void ChatHandler::ExecuteCommand_richard_D(const char* text)
+bool ChatHandler::ExecuteCommand_richard_D(const char* text)
 {
 
 
 	if ( text == 0 )
 	{
-		return;
+		return false;
 	}
 
 	if ( text[0] == 0 )
 	{
-		return;
+		return false;
 	}
 
-	int SIZE___ = 3;
+	int SIZE___ = 2;
 
 	int lennn = strlen(text) ;
 	if ( lennn < SIZE___+1 )
 	{
-		return;
+		return false;
 	}
 
 
-	if ( text[lennn-1] != ']' )
-	{
-		return;
-	}
+	//if ( text[lennn-1] != ']' )
+	//{
+	//	return false;
+	//}
 
 
 	if ( text[SIZE___] == '\"' )
 	{
 		if ( text[lennn-2] != '\"' )
 		{
-			return;
+			return false;
 		}
 	}
 
 
-	if (    text[SIZE___-3] == '['
-		&&  text[SIZE___-2] == 'q'
-		&&  text[SIZE___-1] == '='
+	if (    text[0] == 'q'
+		&&  text[1] == '='
 		)
 	{
 
@@ -1590,14 +1592,15 @@ void ChatHandler::ExecuteCommand_richard_D(const char* text)
 				break;
 			}
 
-			if ( !guillementUse && text[i] == ']' )
+			if ( !guillementUse && text[i] == '\0' )
 			{
 				break;
 			}
 
 			if ( text[i] == 0 )
 			{
-				break;
+				//command syntax error
+				return false;
 			}
 
 			questName[i-txtOffset] = text[i] ;
@@ -1612,28 +1615,9 @@ void ChatHandler::ExecuteCommand_richard_D(const char* text)
 		if ( !playerrr )
 		{
 			//error ?
-			return;
+			return false;
 		}
 		
-
-		//QuestLocale const* ql = sObjectMgr.GetQuestLocale(linkedQuest->GetQuestId());
-
-		/*
-		for (uint32 questID = 0; questID < sQuestStorage.GetMaxEntry(); ++questID)
-		{
-			ItemPrototype const* prototype = sItemStorage.LookupEntry<ItemPrototype>(questID);
-
-			if ( prototype && StrCmp_noCase ( prototype->Name1 , questName ) )
-			{
-				objectFound = true;
-				
-				
-
-				break;
-			}
-
-		}
-		*/
 
 		std::string questNameStr = std::string(questName);
 
@@ -1692,26 +1676,30 @@ void ChatHandler::ExecuteCommand_richard_D(const char* text)
 
 			if ( queeeFound->ReqItemCount[0] )
 			{
+				std::string itemNameLink = Richa_itemIdToNiceLink( queeeFound->ReqItemId[0] );
 				char messageOUt[2048];
-				sprintf(messageOUt,"%d item=%d",queeeFound->ReqItemCount[0] , queeeFound->ReqItemId[0] );
+				sprintf(messageOUt,"%d %s (item=%d)",queeeFound->ReqItemCount[0] , itemNameLink.c_str(), queeeFound->ReqItemId[0]  );
 				PSendSysMessage(messageOUt);
 			}
 			if ( queeeFound->ReqItemCount[1] )
 			{
+				std::string itemNameLink = Richa_itemIdToNiceLink( queeeFound->ReqItemId[1] );
 				char messageOUt[2048];
-				sprintf(messageOUt,"%d item=%d",queeeFound->ReqItemCount[1] , queeeFound->ReqItemId[1] );
+				sprintf(messageOUt,"%d %s (item=%d)",queeeFound->ReqItemCount[1] , itemNameLink.c_str(), queeeFound->ReqItemId[1]  );
 				PSendSysMessage(messageOUt);
 			}
 			if ( queeeFound->ReqItemCount[2] )
 			{
+				std::string itemNameLink = Richa_itemIdToNiceLink( queeeFound->ReqItemId[2] );
 				char messageOUt[2048];
-				sprintf(messageOUt,"%d item=%d",queeeFound->ReqItemCount[2] , queeeFound->ReqItemId[2] );
+				sprintf(messageOUt,"%d %s (item=%d)",queeeFound->ReqItemCount[2] , itemNameLink.c_str(), queeeFound->ReqItemId[2]  );
 				PSendSysMessage(messageOUt);
 			}
 			if ( queeeFound->ReqItemCount[3] )
 			{
+				std::string itemNameLink = Richa_itemIdToNiceLink( queeeFound->ReqItemId[3] );
 				char messageOUt[2048];
-				sprintf(messageOUt,"%d item=%d",queeeFound->ReqItemCount[3] , queeeFound->ReqItemId[3] );
+				sprintf(messageOUt,"%d %s (item=%d)",queeeFound->ReqItemCount[3] , itemNameLink.c_str(), queeeFound->ReqItemId[3]  );
 				PSendSysMessage(messageOUt);
 			}
 			if ( queeeFound->ReqCreatureOrGOCount[0] )
@@ -1769,11 +1757,11 @@ void ChatHandler::ExecuteCommand_richard_D(const char* text)
 
 		}
 
-
+		return true; // si le string commence par  q=   on va considerer que c'est pris en charge dans tous les cas
 	}
 
 
-	return;
+	return false;
 
 }
 
@@ -1785,7 +1773,7 @@ void ChatHandler::ExecuteCommand_richard_D(const char* text)
 // exemple :  |cff1eff00|Hitem:70010:0:0:0|h[YouhaiCoin Paragon]|h|r
 //exemple :   |cffa335ee|Hitem:13353:0:0:0|h[Book of the Dead]|h|r
 //je crois que le premier nombre est la couleur
-void ChatHandler::ExecuteCommand_richard_A(const char* text)
+bool ChatHandler::ExecuteCommand_richard_A(const char* text)
 {
 	
 	//
@@ -1796,12 +1784,12 @@ void ChatHandler::ExecuteCommand_richard_A(const char* text)
 
 	if ( text == 0 )
 	{
-		return;
+		return false;
 	}
 
 	if ( text[0] == 0 )
 	{
-		return;
+		return false;
 	}
 
 	const char beg[] = "|cffffffff|Hitem:";
@@ -1823,7 +1811,7 @@ void ChatHandler::ExecuteCommand_richard_A(const char* text)
 			}
 			else
 			{
-				return;
+				return false;
 			}
 
 		}
@@ -1831,7 +1819,7 @@ void ChatHandler::ExecuteCommand_richard_A(const char* text)
 			
 		else if ( text[i] != beg[i] )
 		{
-			return;
+			return false;
 		}
 	}
 
@@ -1846,12 +1834,12 @@ void ChatHandler::ExecuteCommand_richard_A(const char* text)
 
 		if ( text[i] == 0 )
 		{
-			return;
+			return false;
 		}
 
 		if ( j > 100 )
 		{
-			return;
+			return false;
 		}
 
 		number[j] = text[i]; j++;
@@ -1861,32 +1849,34 @@ void ChatHandler::ExecuteCommand_richard_A(const char* text)
 
 	int numberID = atoi(number);
 
-	ExecuteCommand_richard_2(numberID);
+	bool chargeee = ExecuteCommand_richard_2(numberID);
 
+	return chargeee;
 }
 
 
 // sert a avoir des information sur un Item a partir de son ID
-void ChatHandler::ExecuteCommand_richard_2(int numberID)
+// return TRUE if taken in charge
+bool ChatHandler::ExecuteCommand_richard_2(int numberID)
 {
 
 	char messageOUt[2048];
 
 	ItemPrototype const* itemProtoype = sItemStorage.LookupEntry<ItemPrototype>(numberID);
     if (!itemProtoype)
-            return;
+            return false;
 
 
 	if ( m_session == 0 )
 	{
-		return;
+		return false;
 	}
 
 	Player* player = m_session->GetPlayer();
 
 	if ( player == 0 )
 	{
-		return;
+		return false;
 	}
 
 
@@ -2066,7 +2056,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 		{
 			sprintf(messageOUt,"INFO : pas de perso primaire associe a ce perso");
 			PSendSysMessage(messageOUt);
-			return;
+			return false;
 		}
 
 		// en fait je pense que c'est mieux d'utiliser la liste ci dessous plutot que la liste ci dessus
@@ -2146,7 +2136,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 						nameFile[0] = 0;
 						sprintf(messageOUt,"ERROR: pas de fichier pour le perso primaire");
 						PSendSysMessage(messageOUt);
-						return;
+						return false;
 					}
 				}
 			}
@@ -2196,7 +2186,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 							sprintf(messageOUt,"ERREUR DE LECTURE DE FICHIER 001 !!!!");
 							PSendSysMessage(messageOUt);
 							myfile.close();
-							return;
+							return false;
 						}
 					}
 					else if ( line.size() == 0 )
@@ -2218,7 +2208,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 							if ( i > 100 )
 							{
 								myfile.close();
-								return;
+								return false;
 							}
 
 							number[i] = line[i];
@@ -2255,7 +2245,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 			{
 				sprintf(messageOUt,"ERREUR DE LECTURE DE FICHIER 002 !!!!");
 				PSendSysMessage(messageOUt);
-				return;
+				return false;
 			}
 
 
@@ -2263,7 +2253,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 			{
 				sprintf(messageOUt,"ERREUR DE LECTURE DE FICHIER 003 !!!!");
 				PSendSysMessage(messageOUt);
-				return;
+				return false;
 			}
 
 			
@@ -2376,7 +2366,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 							PSendSysMessage(messageOUt);
 							delete result2;
 							delete result1;
-							return;
+							return false;
 						}
 
 						BarGoLink bar(result2->GetRowCount());
@@ -2404,7 +2394,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 						sprintf(messageOUt,"ERROR 104 avec le taux de loot");
 						PSendSysMessage(messageOUt);
 						delete result1;
-						return;
+						return false;
 					}
 			
 				}
@@ -2442,7 +2432,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 						sprintf(messageOUt,"ERROR 153 avec le taux de loot");
 						PSendSysMessage(messageOUt);
 						delete result1;
-						return;
+						return false;
 					}
 			
 				}
@@ -2458,7 +2448,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 					sprintf(messageOUt,"ERROR 337 avec le taux de loot");
 					PSendSysMessage(messageOUt);
 					delete result1;
-					return;
+					return false;
 				}
 
 
@@ -2509,7 +2499,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 						PSendSysMessage(messageOUt);
 						delete result2;
 						delete result1;
-						return;
+						return false;
 					}
 
 					BarGoLink bar(result2->GetRowCount());
@@ -2535,7 +2525,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 					sprintf(messageOUt,"ERROR 104 avec le taux de loot");
 					PSendSysMessage(messageOUt);
 					delete result1;
-					return;
+					return false;
 				}
 			
 
@@ -2590,7 +2580,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 						PSendSysMessage(messageOUt);
 						delete result2;
 						delete result1;
-						return;
+						return false;
 					}
 
 					BarGoLink bar(result2->GetRowCount());
@@ -2616,7 +2606,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 					sprintf(messageOUt,"ERROR 104 avec le taux de loot");
 					PSendSysMessage(messageOUt);
 					delete result1;
-					return;
+					return false;
 				}
 			
 
@@ -2763,6 +2753,7 @@ void ChatHandler::ExecuteCommand_richard_2(int numberID)
 	//sprintf(messageOUt,"Item.spellid_1.category=%d",itemProtoype->Spells[0].SpellCategory);
 	//PSendSysMessage(messageOUt);
 
+	return true;
 }
 
 
@@ -2902,10 +2893,16 @@ bool ChatHandler::ParseCommands(const char* text)
 
 
 				
-		ExecuteCommand_richard_A(text);
-		ExecuteCommand_richard_B(text);
-		ExecuteCommand_richard_C(text);
-		ExecuteCommand_richard_D(text);
+		bool takenInCharge = false;
+
+		takenInCharge = ExecuteCommand_richard_A(text);
+		if ( takenInCharge ) return true;
+		takenInCharge = ExecuteCommand_richard_B(text);
+		if ( takenInCharge ) return true;
+		takenInCharge = ExecuteCommand_richard_C(text);
+		if ( takenInCharge ) return true;
+		takenInCharge = ExecuteCommand_richard_D(text);
+		if ( takenInCharge ) return true;
 
 
 
