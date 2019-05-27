@@ -62,6 +62,43 @@
 ##########################*/
 
 /////////////////////////////////////////////////
+/// Controlling player: get which player is the "master" of the unit gameplay-wise
+///
+/// @note Relations API Tier 1
+///
+/// Client-side counterpart: <tt>CGUnit_C::GetControllingPlayer(CGUnit_C *this)</tt>
+/// Contains optional logic for getting original permanent "master" by ignoring charms (also known as "UI PoV"), datamined from other functions.
+/////////////////////////////////////////////////
+Player const* Unit::GetControllingPlayer(bool ignoreCharms/* = false*/) const
+{
+    // Mode selector: normal or permanent (UI point of view, ignore charms)
+    ObjectGuid const& (Unit::* getter) () const = (ignoreCharms ? &Unit::GetOwnerGuid : &Unit::GetMasterGuid);
+
+    // Original logic begins
+
+    // TBC+: up to master's master
+    if (ObjectGuid const& masterGuid = (this->*getter)())
+    {
+        if (Unit const* master = ObjectAccessor::GetUnit(*this, masterGuid))
+        {
+            if (master->GetTypeId() == TYPEID_PLAYER)
+                return static_cast<Player const*>(master);
+            if (ObjectGuid const& masterMasterGuid = (master->*getter)())
+            {
+                if (Unit const* masterMaster = ObjectAccessor::GetUnit(*this, masterMasterGuid))
+                {
+                    if (masterMaster->GetTypeId() == TYPEID_PLAYER)
+                        return static_cast<Player const*>(masterMaster);
+                }
+            }
+        }
+    }
+    else if (GetTypeId() == TYPEID_PLAYER)
+        return static_cast<Player const*>(this);
+    return nullptr;
+}
+
+/////////////////////////////////////////////////
 /// Get faction template to faction tenplate reaction
 ///
 /// @note Relations API Tier 1
@@ -133,7 +170,7 @@ static ReputationRank GetFactionReaction(FactionTemplateEntry const* thisTemplat
 
     if (thisTemplate)
     {
-        if (const FactionTemplateEntry* unitFactionTemplate = unit->getFactionTemplateEntry())
+        if (const FactionTemplateEntry* unitFactionTemplate = unit->GetFactionTemplateEntry())
         {
             if (unit->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED))
             {
@@ -203,9 +240,16 @@ ReputationRank Unit::GetReactionTo(Unit const* unit) const
                         return REP_HOSTILE;
                 }
 
+                // [XFACTION]: Swap WotLK+ group check with "Alliance Generic" and 'Horde Generic" for crossfaction functionality
+                if (sWorld.getConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_INTERACTION_GROUP) && thisPlayer->GetTeam() != unitPlayer->GetTeam())
+                {
+                    if (!unitPlayer->HasCharmer() && thisPlayer->IsInGroup(unitPlayer))
+                        return GetFactionReaction(GetFactionTemplateEntry(), sFactionTemplateStore.LookupEntry((thisPlayer->GetTeam() == ALLIANCE ? 1054 : 1495)));
+                }
+
                 // WotLK+ group check: faction to unit
                 if (thisPlayer->IsInGroup(unitPlayer))
-                    return GetFactionReaction(getFactionTemplateEntry(), unit);
+                    return GetFactionReaction(GetFactionTemplateEntry(), unit);
             }
 
             // WotLK+ FFA check
@@ -215,7 +259,7 @@ ReputationRank Unit::GetReactionTo(Unit const* unit) const
 
         if (thisPlayer)
         {
-            if (const FactionTemplateEntry* unitFactionTemplate = unit->getFactionTemplateEntry())
+            if (const FactionTemplateEntry* unitFactionTemplate = unit->GetFactionTemplateEntry())
             {
                 if (const ReputationRank* rank = thisPlayer->GetReputationMgr().GetForcedRankIfAny(unitFactionTemplate))
                     return (*rank);
@@ -234,7 +278,7 @@ ReputationRank Unit::GetReactionTo(Unit const* unit) const
         }
     }
     // Default fallback if player-specific checks didn't catch anything: facton to unit
-    return GetFactionReaction(getFactionTemplateEntry(), unit);
+    return GetFactionReaction(GetFactionTemplateEntry(), unit);
 }
 
 /////////////////////////////////////////////////
@@ -252,7 +296,7 @@ ReputationRank Unit::GetReactionTo(const Corpse* corpse) const
 
     // Original logic begins
 
-    if (const FactionTemplateEntry* thisTemplate = getFactionTemplateEntry())
+    if (const FactionTemplateEntry* thisTemplate = GetFactionTemplateEntry())
     {
         if (const uint32 corpseTemplateId = corpse->getFaction())
         {
@@ -594,9 +638,9 @@ bool Unit::CanCooperate(const Unit* unit) const
     if (GetCharmerGuid() || unit->GetCharmerGuid())
         return false;
 
-    if (const FactionTemplateEntry* thisFactionTemplate = getFactionTemplateEntry())
+    if (const FactionTemplateEntry* thisFactionTemplate = GetFactionTemplateEntry())
     {
-        if (const FactionTemplateEntry* unitFactionTemplate = unit->getFactionTemplateEntry())
+        if (const FactionTemplateEntry* unitFactionTemplate = unit->GetFactionTemplateEntry())
         {
             if (thisFactionTemplate->factionGroupMask == unitFactionTemplate->factionGroupMask)
                 return (!CanAttack(unit));
@@ -808,10 +852,10 @@ bool Unit::IsCivilianForTarget(Unit const* pov) const
 /// @note Relations API Tier 1
 ///
 /// Based on client-side counterpart: <tt>static CGUnit_C::IsUnitInGroup(const CGUnit_C *this, const CGUnit_C *unit)</tt>
-/// Additionally contains optional detection of same group from UI standpoint datamined from other functions.
 /// Points of view are swapped to fit in with the rest of API, logic is preserved.
+/// Additionally contains optional detection of same group from UI standpoint (ignoring charms).
 /////////////////////////////////////////////////
-bool Unit::IsInGroup(Unit const* other, bool party/* = false*/, bool UI/* = false*/) const
+bool Unit::IsInGroup(Unit const* other, bool party/* = false*/, bool ignoreCharms/* = false*/) const
 {
     // Simple sanity check
     if (!other)
@@ -826,51 +870,10 @@ bool Unit::IsInGroup(Unit const* other, bool party/* = false*/, bool UI/* = fals
     // Only player controlled
     if (this->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED) && other->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED))
     {
-        // UI mode: only players and their current pets/charms are in the party UI
-        if (UI)
-        {
-            const size_t comparisions = 3;
-            const Player* thisPlayer[comparisions] = { nullptr, nullptr, nullptr };
-            const Player* otherPlayer[comparisions] = { nullptr, nullptr, nullptr };
-
-            auto getUIPlayerComparisions = [] (const Unit* unit, const Player* (&array)[comparisions])
-            {
-                // In reverse order
-                if (unit->GetTypeId() == TYPEID_PLAYER)
-                    array[0] = static_cast<const Player*>(unit);
-                 ObjectGuid const& summonerGuid = unit->GetSummonerGuid();
-                 ObjectGuid const& charmerGuid = unit->GetCharmerGuid();
-                 if (summonerGuid.IsPlayer())
-                    array[1] = sObjectMgr.GetPlayer(summonerGuid);
-                 if (charmerGuid.IsPlayer())
-                    array[2] = sObjectMgr.GetPlayer(charmerGuid);
-            };
-
-            getUIPlayerComparisions(this, thisPlayer);
-            getUIPlayerComparisions(other, otherPlayer);
-
-            for (auto& i : thisPlayer)
-            {
-                if (i)
-                {
-                    for (auto& j : otherPlayer)
-                    {
-                        if (j)
-                        {
-                            const Group* group = i->GetGroup();
-                            if (i == j || (group && group == j->GetGroup() && (!party || group->SameSubGroup(i, j))))
-                                return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-
         // Check if controlling players are in the same group (same logic as client, but not local)
-        if (const Player* thisPlayer = GetControllingPlayer())
+        if (const Player* thisPlayer = GetControllingPlayer(ignoreCharms))
         {
-            if (const Player* otherPlayer = other->GetControllingPlayer())
+            if (const Player* otherPlayer = other->GetControllingPlayer(ignoreCharms))
             {
                 const Group* group = thisPlayer->GetGroup();
                 return (thisPlayer == otherPlayer || (group && group == otherPlayer->GetGroup() && (!party || group->SameSubGroup(thisPlayer, otherPlayer))));
@@ -1066,7 +1069,7 @@ bool DynamicObject::IsFriend(Unit const* unit) const
 /// Dynamic objects act as serverside proxy casters for units.
 /// It utilizes owners CanAttackSpell if owner exists
 /////////////////////////////////////////////////
-bool DynamicObject::CanAttackSpell(const Unit* target, SpellEntry const* spellInfo, bool isAOE) const
+bool DynamicObject::CanAttackSpell(Unit const* target, SpellEntry const* spellInfo, bool isAOE) const
 {
     if (Unit* owner = GetCaster())
         return owner->CanAttackSpell(target, spellInfo, isAOE);
@@ -1082,7 +1085,7 @@ bool DynamicObject::CanAttackSpell(const Unit* target, SpellEntry const* spellIn
 /// Dynamic objects act as serverside proxy casters for units.
 /// It utilizes owners CanAssistSpell if owner exists
 /////////////////////////////////////////////////
-bool DynamicObject::CanAssistSpell(const Unit* target, SpellEntry const* spellInfo) const
+bool DynamicObject::CanAssistSpell(Unit const* target, SpellEntry const* spellInfo) const
 {
     if (Unit* owner = GetCaster())
         return owner->CanAttackSpell(target, spellInfo);
@@ -1098,11 +1101,14 @@ bool DynamicObject::CanAssistSpell(const Unit* target, SpellEntry const* spellIn
 /// Some gameobjects can be involved in spell casting, so server needs additional API support.
 /// It utilizes owners CanAttackSpell if owner exists
 /////////////////////////////////////////////////
-bool GameObject::CanAttackSpell(const Unit* target, SpellEntry const* spellInfo, bool isAOE) const
+bool GameObject::CanAttackSpell(Unit const* target, SpellEntry const* spellInfo, bool isAOE) const
 {
     Unit* owner = GetOwner();
     if (owner)
         return owner->CanAttackSpell(target, spellInfo, isAOE);
+
+    if (target->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED))
+        return !IsFriend(target);
 
     return IsEnemy(target);
 }
@@ -1116,11 +1122,14 @@ bool GameObject::CanAttackSpell(const Unit* target, SpellEntry const* spellInfo,
 /// Some gameobjects can be involved in spell casting, so server needs additional API support.
 /// It utilizes owners CanAssistSpell if owner exists
 /////////////////////////////////////////////////
-bool GameObject::CanAssistSpell(const Unit* target, SpellEntry const* spellInfo) const
+bool GameObject::CanAssistSpell(Unit const* target, SpellEntry const* spellInfo) const
 {
     Unit* owner = GetOwner();
     if (owner)
         return owner->CanAssistSpell(target, spellInfo);
+
+    if (target->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED))
+        return !IsEnemy(target);
 
     return IsFriend(target);
 }
@@ -1135,7 +1144,7 @@ bool GameObject::CanAssistSpell(const Unit* target, SpellEntry const* spellInfo)
 /// Also an additional fine grained check needs to be done for AOE spells, because they
 /// need to skip PVP enabled targets in some special cases. (Chain spells, AOE)
 /////////////////////////////////////////////////
-bool Unit::CanAttackSpell(const Unit* target, SpellEntry const* spellInfo, bool isAOE) const
+bool Unit::CanAttackSpell(Unit const* target, SpellEntry const* spellInfo, bool isAOE) const
 {
     if (spellInfo)
     {
@@ -1191,7 +1200,7 @@ bool Unit::CanAttackSpell(const Unit* target, SpellEntry const* spellInfo, bool 
 /// This function is not intented to have client-side counterpart by original design.
 /// It utilizes owners CanAssistSpell if owner exists
 /////////////////////////////////////////////////
-bool Unit::CanAssistSpell(const Unit* target, SpellEntry const* spellInfo) const
+bool Unit::CanAssistSpell(Unit const* target, SpellEntry const* spellInfo) const
 {
     return CanAssist(target);
 }
@@ -1205,9 +1214,9 @@ bool Unit::CanAssistSpell(const Unit* target, SpellEntry const* spellInfo) const
 /// It utilizes CanAttack with a small exclusion for Feign-Death targets and a hostile-only check.
 /// Typically used in AIs in MoveInLineOfSight
 /////////////////////////////////////////////////
-bool Unit::CanAttackOnSight(const Unit* target)
+bool Unit::CanAttackOnSight(Unit const* target) const
 {
-    return CanAttack(target) && !target->IsFeigningDeathSuccessfully() && IsEnemy(target);
+    return CanAttack(target) && !target->IsFeigningDeathSuccessfully() && target->GetEvade() != EVADE_HOME && IsEnemy(target);
 }
 
 /////////////////////////////////////////////////
@@ -1248,7 +1257,7 @@ bool Unit::IsFogOfWarVisibleHealth(Unit const* other) const
     switch (sWorld.getConfig(CONFIG_UINT32_FOGOFWAR_HEALTH))
     {
         case 0:  return IsInGroup(other, false, true);
-        case 1:  return CanCooperate(other);
+        case 1:  return IsInTeam(other);
         default: return true;
     }
 }
@@ -1270,7 +1279,93 @@ bool Unit::IsFogOfWarVisibleStats(Unit const* other) const
     switch (sWorld.getConfig(CONFIG_UINT32_FOGOFWAR_STATS))
     {
         default: return (this == other || GetSummonerGuid() == other->GetObjectGuid());
-        case 1:  return CanCooperate(other);
+        case 1:  return IsInTeam(other);
         case 2:  return true;
     }
+}
+
+/////////////////////////////////////////////////
+/// [Serverside] Guild: Unit counts as being placed in the same guild with another unit (for gameplay purposes)
+///
+/// @note Relations API Tier 3
+///
+/// Loosely inspired by client-side Lua script counterpart: <tt>UnitIsInMyGuild()</tt>
+/// Additionally contains optional detection of same guild from UI standpoint (ignoring charms).
+/////////////////////////////////////////////////
+bool Unit::IsInGuild(Unit const* other, bool ignoreCharms/* = false*/) const
+{
+    // Simple sanity check
+    if (!other)
+        return false;
+
+    // Same unit is always in guild with itself
+    if (this == other)
+        return true;
+
+    // Only player controlled
+    if (this->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED) && other->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED))
+    {
+        // Check if controlling players are in the same group (same logic as client, but not local)
+        if (const Player* thisPlayer = GetControllingPlayer(ignoreCharms))
+        {
+            if (const Player* otherPlayer = other->GetControllingPlayer(ignoreCharms))
+                return (thisPlayer == otherPlayer || (thisPlayer->GetGuildId() == otherPlayer->GetGuildId()));
+        }
+    }
+
+    return false;
+}
+
+/////////////////////////////////////////////////
+/// [Serverside] Team: Check if both units are in the same faction team (for gameplay purposes)
+///
+/// @note Relations API Tier 3
+///
+/// Loosely inspired by client-side Lua script counterpart: <tt>UnitFactionGroup()</tt>
+/// Additionally contains optional detection of same team temporarily with taking charms in account.
+bool Unit::IsInTeam(const Unit *other, bool ignoreCharms) const
+{
+    // Simple sanity check
+    if (!other)
+        return false;
+
+    // Same unit is always in team with itself
+    if (this == other)
+        return true;
+
+    // Only player controlled
+    if (this->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED) && other->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED))
+    {
+        // Check if controlling players are in the same group (same logic as client, but not local)
+        if (const Player* thisPlayer = GetControllingPlayer(ignoreCharms))
+        {
+            if (const Player* otherPlayer = other->GetControllingPlayer(ignoreCharms))
+                return (thisPlayer == otherPlayer || (thisPlayer->GetTeam() == otherPlayer->GetTeam()));
+        }
+    }
+
+    return false;
+}
+
+/////////////////////////////////////////////////
+/// [Serverside] Opposition: this can assist who in attacking enemy
+///
+/// @note Relations API Tier 3
+///
+/// This function is not intented to have client-side counterpart by original design.
+/// A helper function used to determine if current unit can assist who against enemy
+/// Used in several assistance checks
+/////////////////////////////////////////////////
+bool Unit::CanAssistInCombatAgainst(Unit const* who, Unit const* enemy) const
+{
+    if (GetMap()->Instanceable()) // in dungeons nothing else needs to be evaluated
+        return true;
+
+    if (isInCombat()) // if fighting something else, do not assist
+        return false;
+
+    if (CanAssist(who) && CanAttackOnSight(enemy))
+        return true;
+
+    return false;
 }

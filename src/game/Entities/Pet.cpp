@@ -30,7 +30,7 @@ Pet::Pet(PetType type) :
     Creature(CREATURE_SUBTYPE_PET),
     m_resetTalentsCost(0), m_resetTalentsTime(0), m_usedTalentCount(0),
     m_removed(false), m_happinessTimer(7500), m_petType(type), m_duration(0),
-    m_bonusdamage(0), m_auraUpdateMask(0), m_loading(false),
+    m_bonusdamage(0), m_loading(false),
     m_declinedname(nullptr), m_petModeFlags(PET_MODE_DEFAULT), m_originalCharminfo(nullptr)
 {
     m_name = "Pet";
@@ -311,17 +311,17 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petentry /*= 0*/, uint32 petnumber
     m_resetTalentsCost = fields[15].GetUInt32();
     m_resetTalentsTime = fields[16].GetUInt64();
 
-    delete result;
-
     // load spells/cooldowns/auras
     _LoadAuras(timediff);
+
+    // remove arena auras if in arena - but only DB loaded ones
+    if (map->IsBattleArena())
+        RemoveArenaAuras();
 
     // init AB
     LearnPetPassives();
     CastPetAuras(current);
     CastOwnerTalentAuras();
-    InitTamedPetPassives(owner);
-    UpdateAllStats();
 
     // Those two following call was moved here to fix health is not full after pet invocation (before, they where placed after map->Add())
     _LoadSpells();
@@ -329,9 +329,7 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petentry /*= 0*/, uint32 petnumber
     // TODO: confirm two line above work in all situation
     InitPetScalingAuras();
 
-    // remove arena auras if in arena
-    if (map->IsBattleArena())
-        RemoveArenaAuras();
+    UpdateAllStats();
 
     // failsafe check
     savedhealth = savedhealth > GetMaxHealth() ? GetMaxHealth() : savedhealth;
@@ -628,7 +626,7 @@ void Pet::SetDeathState(DeathState s)                       // overwrite virtual
     CastOwnerTalentAuras();
 }
 
-void Pet::Update(uint32 update_diff, uint32 diff)
+void Pet::Update(const uint32 diff)
 {
     if (m_removed)                                          // pet already removed, just wait in remove queue, no updates
         return;
@@ -637,7 +635,7 @@ void Pet::Update(uint32 update_diff, uint32 diff)
     {
         case CORPSE:
         {
-            if (m_corpseDecayTimer <= update_diff)
+            if (IsCorpseExpired())
             {
                 // pet is dead so it doesn't have to be shown at character login
                 Unsummon(PET_SAVE_NOT_IN_SLOT);
@@ -668,8 +666,8 @@ void Pet::Update(uint32 update_diff, uint32 diff)
 
             if (m_duration > 0)
             {
-                if (m_duration > (int32)update_diff)
-                    m_duration -= (int32)update_diff;
+                if (m_duration > (int32)diff)
+                    m_duration -= (int32)diff;
                 else
                 {
                     Unsummon(getPetType() != SUMMON_PET ? PET_SAVE_AS_DELETED : PET_SAVE_NOT_IN_SLOT, owner);
@@ -682,7 +680,7 @@ void Pet::Update(uint32 update_diff, uint32 diff)
             break;
     }
 
-    Creature::Update(update_diff, diff);
+    Creature::Update(diff);
 }
 
 void Pet::RegenerateAll(uint32 update_diff)
@@ -690,7 +688,7 @@ void Pet::RegenerateAll(uint32 update_diff)
     // regenerate focus for hunter pets or energy for deathknight's ghoul
     if (m_regenTimer <= update_diff)
     {
-        if (!isInCombat() || IsPolymorphed())
+        if (!isInCombat())
             RegenerateHealth();
 
         RegeneratePower();
@@ -967,8 +965,6 @@ void Pet::InitStatsForLevel(uint32 petlevel)
 
     SetFloatValue(UNIT_MOD_CAST_SPEED, 1.0);
 
-    int32 createResistance[MAX_SPELL_SCHOOL] = {0, 0, 0, 0, 0, 0, 0};
-
     if (getPetType() == HUNTER_PET)
     {
         SetMeleeDamageSchool(SpellSchools(SPELL_SCHOOL_NORMAL));
@@ -983,16 +979,13 @@ void Pet::InitStatsForLevel(uint32 petlevel)
         SetAttackTime(OFF_ATTACK, cInfo->MeleeBaseAttackTime);
         SetAttackTime(RANGED_ATTACK, cInfo->RangedBaseAttackTime);
 
-        createResistance[SPELL_SCHOOL_HOLY]   = cInfo->ResistanceHoly;
-        createResistance[SPELL_SCHOOL_FIRE]   = cInfo->ResistanceFire;
-        createResistance[SPELL_SCHOOL_NATURE] = cInfo->ResistanceNature;
-        createResistance[SPELL_SCHOOL_FROST]  = cInfo->ResistanceFrost;
-        createResistance[SPELL_SCHOOL_SHADOW] = cInfo->ResistanceShadow;
-        createResistance[SPELL_SCHOOL_ARCANE] = cInfo->ResistanceArcane;
+        SetCreateResistance(SPELL_SCHOOL_HOLY, cInfo->ResistanceHoly);
+        SetCreateResistance(SPELL_SCHOOL_FIRE, cInfo->ResistanceFire);
+        SetCreateResistance(SPELL_SCHOOL_NATURE, cInfo->ResistanceNature);
+        SetCreateResistance(SPELL_SCHOOL_FROST, cInfo->ResistanceFrost);
+        SetCreateResistance(SPELL_SCHOOL_SHADOW, cInfo->ResistanceShadow);
+        SetCreateResistance(SPELL_SCHOOL_ARCANE, cInfo->ResistanceArcane);
     }
-
-    for (int i = SPELL_SCHOOL_HOLY; i < MAX_SPELL_SCHOOL; ++i)
-        SetModifierValue(UnitMods(UNIT_MOD_RESISTANCE_START + i), BASE_VALUE, float(createResistance[i]));
 
     float health = 0.f;
     float mana = 0.f;
@@ -1244,7 +1237,7 @@ void Pet::InitStatsForLevel(uint32 petlevel)
     SetCreateHealth(health);
     SetCreateMana(mana);
     // Set base Armor
-    SetModifierValue(UNIT_MOD_ARMOR, BASE_VALUE, armor);
+    SetCreateResistance(SPELL_SCHOOL_NORMAL, int32(armor));
 
     InitPetScalingAuras();
 
@@ -1758,7 +1751,7 @@ bool Pet::addSpell(uint32 spell_id, ActiveStates active /*= ACT_DECIDE*/, PetSpe
     if (active == ACT_DECIDE)                               // active was not used before, so we save it's autocast/passive state here
     {
         if (IsAutocastable(spellInfo))
-            newspell.active = ACT_DISABLED;
+            newspell.active = ACT_ENABLED;
         else
             newspell.active = ACT_PASSIVE;
     }
@@ -1792,10 +1785,10 @@ bool Pet::addSpell(uint32 spell_id, ActiveStates active /*= ACT_DECIDE*/, PetSpe
 
             uint32 const oldspell_id = itr2->first;
 
-            if (sSpellMgr.IsRankSpellDueToSpell(spellInfo, oldspell_id))
+            if (sSpellMgr.IsSpellAnotherRankOfSpell(spell_id, oldspell_id))
             {
                 // replace by new high rank
-                if (sSpellMgr.IsHighRankOfSpell(spell_id, oldspell_id))
+                if (sSpellMgr.IsSpellHigherRankOfSpell(spell_id, oldspell_id))
                 {
                     newspell.active = itr2->second.active;
 
@@ -1806,7 +1799,7 @@ bool Pet::addSpell(uint32 spell_id, ActiveStates active /*= ACT_DECIDE*/, PetSpe
                     break;
                 }
                 // ignore new lesser rank
-                if (sSpellMgr.IsHighRankOfSpell(oldspell_id, spell_id))
+                if (sSpellMgr.IsSpellHigherRankOfSpell(oldspell_id, spell_id))
                     return false;
             }
         }
@@ -2451,56 +2444,6 @@ void Pet::SetModeFlags(PetModeFlags mode)
     data << GetObjectGuid();
     data << uint32(m_petModeFlags);
     ((Player*)owner)->GetSession()->SendPacket(data);
-}
-
-//Todo: Hack alert, remove this for a better solution when its possible
-void Pet::InitTamedPetPassives(Unit* player)
-{
-    switch (player->getClass())
-    {
-        case CLASS_HUNTER:
-        {
-            // case 13481: Tame Beast
-            player->CastSpell(this, 8875, TRIGGERED_OLD_TRIGGERED);
-            break;
-        }
-        case CLASS_WARLOCK:
-        {
-            switch (GetUInt32Value(UNIT_CREATED_BY_SPELL))
-            {
-                case 688: // imp
-                    player->CastSpell(this, 18728, TRIGGERED_OLD_TRIGGERED);
-                    break;
-                case 691: // felhunter
-                    player->CastSpell(this, 18730, TRIGGERED_OLD_TRIGGERED);
-                    break;
-                case 697: // voidwalker
-                    player->CastSpell(this, 18727, TRIGGERED_OLD_TRIGGERED);
-                    break;
-                case 712: // succubus
-                    player->CastSpell(this, 18729, TRIGGERED_OLD_TRIGGERED);
-                    break;
-                case 30146: // felguard
-                    player->CastSpell(this, 30147, TRIGGERED_OLD_TRIGGERED);
-                    break;
-                default:
-                    break;
-            }
-            break;
-        }
-        case CLASS_SHAMAN:
-        {
-            player->CastSpell(this, 65221, TRIGGERED_OLD_TRIGGERED);
-            break;
-        }
-        case CLASS_DEATH_KNIGHT:
-        {
-            player->CastSpell(this, 65223, TRIGGERED_OLD_TRIGGERED);
-            break;
-        }
-        default:
-            break;
-    }
 }
 
 void Pet::RegenerateHealth()

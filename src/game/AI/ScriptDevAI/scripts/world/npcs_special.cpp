@@ -27,6 +27,8 @@ EndScriptData
 #include "AI/ScriptDevAI/base/pet_ai.h"
 #include "Globals/ObjectMgr.h"
 #include "GameEvents/GameEventMgr.h"
+#include "Entities/TemporarySpawn.h"
+#include "AI/ScriptDevAI/base/TimerAI.h"
 
 /* ContentData
 npc_air_force_bots       80%    support for misc (invisible) guard bots in areas where player allowed to fly. Summon guards after a preset time if tagged by spell
@@ -39,7 +41,8 @@ npc_doctor              100%    Gustaf Vanhowzen and Gregory Victor, quest 6622 
 npc_innkeeper            25%    ScriptName not assigned. Innkeepers in general.
 npc_spring_rabbit         1%    Used for pet "Spring Rabbit" of Noblegarden
 npc_redemption_target   100%    Used for the paladin quests: 1779,1781,9600,9685
-npc_burster_worm        100%    Used for the crust burster worms in Outland. Npc entries: 16844, 16857, 16968, 21380, 21849, 22038, 22466, 22482, 23285
+npc_burster_worm        100%    Used for the crust burster worms in Outland. Npc entries: 16844, 16857, 16968, 17075, 18678, 21380, 21849, 22038, 22466, 22482, 23285
+npc_aoe_damage_trigger   75%    Used for passive aoe damage triggers in various encounters with overlapping usage of entries: 16697, 17471, 20570, 18370, 20598
 npc_mage_mirror_image    90%    mage mirror image pet
 EndContentData */
 
@@ -252,9 +255,8 @@ UnitAI* GetAI_npc_air_force_bots(Creature* pCreature)
 
 enum
 {
-    EMOTE_A_HELLO           = -1000204,
-    EMOTE_H_HELLO           = -1000205,
-    EMOTE_CLUCK_TEXT2       = -1000206,
+    EMOTE_CLUCK_TEXT1       = -1000204,
+    EMOTE_CLUCK_TEXT2       = -1000205,
 
     QUEST_CLUCK             = 3861,
     FACTION_FRIENDLY        = 35,
@@ -269,7 +271,7 @@ struct npc_chicken_cluckAI : public ScriptedAI
 
     void Reset() override
     {
-        m_uiResetFlagTimer = 120000;
+        m_uiResetFlagTimer = 20000;
 
         m_creature->setFaction(FACTION_CHICKEN);
         m_creature->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
@@ -277,35 +279,17 @@ struct npc_chicken_cluckAI : public ScriptedAI
 
     void ReceiveEmote(Player* pPlayer, uint32 uiEmote) override
     {
-        if (uiEmote == TEXTEMOTE_CHICKEN)
+        if (uiEmote == TEXTEMOTE_CHICKEN && !urand(0, 49))
         {
-            if (!urand(0, 29))
-            {
-                if (pPlayer->GetQuestStatus(QUEST_CLUCK) == QUEST_STATUS_NONE)
-                {
-                    m_creature->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
-                    m_creature->setFaction(FACTION_FRIENDLY);
-
-                    DoScriptText(EMOTE_A_HELLO, m_creature);
-
-                    /* are there any difference in texts, after 3.x ?
-                    if (pPlayer->GetTeam() == HORDE)
-                        DoScriptText(EMOTE_H_HELLO, m_creature);
-                    else
-                        DoScriptText(EMOTE_A_HELLO, m_creature);
-                    */
-                }
-            }
+            m_creature->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
+            m_creature->setFaction(FACTION_FRIENDLY);
+            DoScriptText(EMOTE_CLUCK_TEXT1, m_creature);
         }
-
-        if (uiEmote == TEXTEMOTE_CHEER)
+        else if (uiEmote == TEXTEMOTE_CHEER && pPlayer->GetQuestStatus(QUEST_CLUCK) == QUEST_STATUS_COMPLETE)
         {
-            if (pPlayer->GetQuestStatus(QUEST_CLUCK) == QUEST_STATUS_COMPLETE)
-            {
-                m_creature->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
-                m_creature->setFaction(FACTION_FRIENDLY);
-                DoScriptText(EMOTE_CLUCK_TEXT2, m_creature);
-            }
+            m_creature->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
+            m_creature->setFaction(FACTION_FRIENDLY);
+            DoScriptText(EMOTE_CLUCK_TEXT2, m_creature);
         }
     }
 
@@ -328,28 +312,6 @@ struct npc_chicken_cluckAI : public ScriptedAI
 UnitAI* GetAI_npc_chicken_cluck(Creature* pCreature)
 {
     return new npc_chicken_cluckAI(pCreature);
-}
-
-bool QuestAccept_npc_chicken_cluck(Player* /*pPlayer*/, Creature* pCreature, const Quest* pQuest)
-{
-    if (pQuest->GetQuestId() == QUEST_CLUCK)
-    {
-        if (npc_chicken_cluckAI* pChickenAI = dynamic_cast<npc_chicken_cluckAI*>(pCreature->AI()))
-            pChickenAI->Reset();
-    }
-
-    return true;
-}
-
-bool QuestRewarded_npc_chicken_cluck(Player* /*pPlayer*/, Creature* pCreature, const Quest* pQuest)
-{
-    if (pQuest->GetQuestId() == QUEST_CLUCK)
-    {
-        if (npc_chicken_cluckAI* pChickenAI = dynamic_cast<npc_chicken_cluckAI*>(pCreature->AI()))
-            pChickenAI->Reset();
-    }
-
-    return true;
 }
 
 /*######
@@ -809,7 +771,7 @@ void npc_doctorAI::UpdateAI(const uint32 uiDiff)
                     {
                         totalSpawned++;
 
-                        // 2.4.3, this flag appear to be required for client side item->spell to work (TARGET_SINGLE_FRIEND)
+                        // 2.4.3, this flag appear to be required for client side item->spell to work (TARGET_UNIT_FRIEND)
                         // Patient->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP);
 
                         m_lPatientGuids.push_back(Patient->GetObjectGuid());
@@ -1445,7 +1407,7 @@ bool EffectDummyCreature_npc_redemption_target(Unit* pCaster, uint32 uiSpellId, 
 ## npc_burster_worm
 ######*/
 
-enum
+enum npc_burster_worm
 {
     // visual and idle spells
     SPELL_TUNNEL_BORE_PASSIVE           = 29147,                // added by c_t_a
@@ -1465,6 +1427,8 @@ enum
     SPELL_POISON_SPIT                   = 32330,
     SPELL_BORE                          = 32738,
     SPELL_ENRAGE                        = 32714,
+    SPELL_WORM_SWEEP                    = 30732,
+    SPELL_WORM_BLAST                    = 31378,
 
     // npcs that get enrage
     NPC_TUNNELER                        = 16968,
@@ -1472,6 +1436,7 @@ enum
 
     // npcs that don't use bore spell
     NPC_MARAUDING_BURSTER               = 16857,
+    NPC_SAND_WORM                       = 17075,
     NPC_FULGORGE                        = 18678,
     NPC_GREATER_CRUST_BURSTER           = 21380,
 
@@ -1501,6 +1466,7 @@ struct npc_burster_wormAI : public ScriptedAI
     uint32 m_uiEnrageTimer;
     uint32 m_uiBorePassive;
     uint32 m_boreDamageSpell;
+    uint32 m_uiWormSweepTimer;
 
     inline uint32 SetBorePassive()
     {
@@ -1543,6 +1509,7 @@ struct npc_burster_wormAI : public ScriptedAI
         m_uiBoreTimer       = 0;
         m_uiBirthDelayTimer = 0;
         m_uiEnrageTimer     = 0;
+        m_uiWormSweepTimer  = urand(5000, 15000);
 
         SetCombatMovement(false);
 
@@ -1641,12 +1608,17 @@ struct npc_burster_wormAI : public ScriptedAI
             // If we are within range melee the target
             if (m_creature->CanReachWithMeleeAttack(m_creature->getVictim()))
                 DoMeleeAttackIfReady();
-            else
+            else if (!m_creature->IsNonMeleeSpellCasted(false))
             {
-                if (!m_creature->IsNonMeleeSpellCasted(false) && m_creature->GetEntry() != NPC_FULGORGE)
-                    DoCastSpellIfCan(m_creature->getVictim(), SPELL_POISON);
-                else if (!m_creature->IsNonMeleeSpellCasted(false))
-                    DoCastSpellIfCan(m_creature->getVictim(), SPELL_POISON_SPIT);
+                switch (m_creature->GetEntry())
+                {
+                    case NPC_FULGORGE:
+                        DoCastSpellIfCan(m_creature->getVictim(), SPELL_POISON_SPIT);
+                    case NPC_SAND_WORM:
+                        DoCastSpellIfCan(m_creature->getVictim(), SPELL_WORM_BLAST);
+                    default:
+                        DoCastSpellIfCan(m_creature->getVictim(), SPELL_POISON);
+                }
 
                 // if target not in range, submerge and chase
                 if (!m_creature->IsInRange(m_creature->getVictim(), 0, 50.0f))
@@ -1657,7 +1629,7 @@ struct npc_burster_wormAI : public ScriptedAI
             }
 
             // bore spell
-            if (m_creature->GetEntry() != NPC_MARAUDING_BURSTER && m_creature->GetEntry() != NPC_FULGORGE && m_creature->GetEntry() != NPC_GREATER_CRUST_BURSTER)
+            if (m_creature->GetEntry() != NPC_MARAUDING_BURSTER && m_creature->GetEntry() != NPC_SAND_WORM && m_creature->GetEntry() != NPC_FULGORGE && m_creature->GetEntry() != NPC_GREATER_CRUST_BURSTER)
             {
                 if (m_uiBoreTimer < uiDiff)
                 {
@@ -1678,6 +1650,18 @@ struct npc_burster_wormAI : public ScriptedAI
                 }
                 else
                     m_uiEnrageTimer -= uiDiff;
+            }
+
+            // worm sweep spell
+            if (m_creature->GetEntry() == NPC_SAND_WORM)
+            {
+                if (m_uiWormSweepTimer < uiDiff)
+                {
+                    if (DoCastSpellIfCan(m_creature, SPELL_WORM_SWEEP) == CAST_OK)
+                        m_uiWormSweepTimer = urand(15000, 25000);
+                }
+                else
+                    m_uiWormSweepTimer -= uiDiff;
             }
         }
         // chase target
@@ -1706,6 +1690,61 @@ struct npc_burster_wormAI : public ScriptedAI
 UnitAI* GetAI_npc_burster_worm(Creature* pCreature)
 {
     return new npc_burster_wormAI(pCreature);
+}
+
+/*######
+## npc_aoe_damage_trigger
+######*/
+
+enum npc_aoe_damage_trigger
+{
+    // trigger npcs
+    NPC_VOID_ZONE = 16697,
+    NPC_LESSER_SHADOW_FISSURE = 17471,
+    NPC_LESSER_SHADOW_FISSURE_H = 20570,
+    NPC_WILD_SHADOW_FISSURE = 18370,
+    NPC_WILD_SHADOW_FISSURE_H = 20598,
+
+    // m_uiAuraPassive
+    SPELL_CONSUMPTION_NPC_16697 = 28874,
+    SPELL_CONSUMPTION_NPC_17471 = 30497,
+    SPELL_CONSUMPTION_NPC_20570 = 35952,
+};
+
+struct npc_aoe_damage_triggerAI : public Scripted_NoMovementAI
+{
+    npc_aoe_damage_triggerAI(Creature* pCreature) : Scripted_NoMovementAI(pCreature), m_uiAuraPassive(SetAuraPassive()) { }
+
+    uint32 m_uiAuraPassive;
+
+    inline uint32 SetAuraPassive()
+    {
+        switch (m_creature->GetCreatureInfo()->Entry)
+        {
+            case NPC_VOID_ZONE:
+                return SPELL_CONSUMPTION_NPC_16697;
+            case NPC_LESSER_SHADOW_FISSURE:
+                return SPELL_CONSUMPTION_NPC_17471;
+            case NPC_LESSER_SHADOW_FISSURE_H:
+                return SPELL_CONSUMPTION_NPC_20570;
+            default:
+                return SPELL_CONSUMPTION_NPC_17471;
+        }
+    }
+
+    void Reset() override
+    {
+        DoCastSpellIfCan(m_creature, m_uiAuraPassive, CAST_TRIGGERED | CAST_AURA_NOT_PRESENT);
+    }
+
+    void AttackStart(Unit* /*pWho*/) override { }
+    void MoveInLineOfSight(Unit* /*pWho*/) override { }
+    void UpdateAI(const uint32 uiDiff) override {}
+};
+
+UnitAI* GetAI_npc_aoe_damage_trigger(Creature* pCreature)
+{
+    return new npc_aoe_damage_triggerAI(pCreature);
 }
 
 /*######
@@ -1948,6 +1987,126 @@ UnitAI* GetAI_npc_snakes(Creature* pCreature)
     return new npc_snakesAI(pCreature);
 }
 
+enum
+{
+    SPELL_DRAIN_MANA = 17008,
+    SPELL_TAIL_STING = 36659,
+    SPELL_NETHER_SHOCK = 35334,
+};
+
+enum RayActions
+{
+    RAY_ACTION_NETHER_SHOCK,
+    RAY_ACTION_DRAIN_MANA,
+    RAY_ACTION_TAIL_STING,
+    RAY_ACTION_MAX,
+};
+
+struct npc_nether_rayAI : public ScriptedAI, public CombatTimerAI
+{
+    npc_nether_rayAI(Creature* creature) : ScriptedAI(creature), CombatTimerAI(RAY_ACTION_MAX)
+    {
+        AddCombatAction(RAY_ACTION_DRAIN_MANA, 0);
+        AddCombatAction(RAY_ACTION_TAIL_STING, 0);
+        AddCombatAction(RAY_ACTION_NETHER_SHOCK, 0);
+    }
+
+    uint32 GetInitialActionTimer(RayActions id)
+    {
+        switch (id)
+        {
+            case RAY_ACTION_DRAIN_MANA: return 2000;
+            case RAY_ACTION_TAIL_STING: return 2000;
+            case RAY_ACTION_NETHER_SHOCK: return 0;
+            default: return 0;
+        }
+    }
+
+    uint32 GetSubsequentActionTimer(RayActions id)
+    {
+        switch (id)
+        {
+            case RAY_ACTION_DRAIN_MANA: return urand(10000, 15000);
+            case RAY_ACTION_TAIL_STING: return 23000;
+            case RAY_ACTION_NETHER_SHOCK: return 5000;
+            default: return 0;
+        }
+    }
+
+    void Reset() override
+    {
+        for (uint32 i = 0; i < RAY_ACTION_MAX; ++i)
+            SetActionReadyStatus(i, false);
+
+        ResetTimer(RAY_ACTION_DRAIN_MANA, GetInitialActionTimer(RAY_ACTION_DRAIN_MANA));
+        ResetTimer(RAY_ACTION_TAIL_STING, GetInitialActionTimer(RAY_ACTION_TAIL_STING));
+        ResetTimer(RAY_ACTION_NETHER_SHOCK, GetInitialActionTimer(RAY_ACTION_NETHER_SHOCK));
+    }
+
+    void ExecuteActions() override
+    {
+        if (!CanExecuteCombatAction())
+            return;
+
+        for (uint32 i = 0; i < RAY_ACTION_MAX; ++i)
+        {
+            if (!GetActionReadyStatus(i))
+                continue;
+
+            switch (i)
+            {
+                case RAY_ACTION_DRAIN_MANA:
+                    if (!m_creature->getVictim() || !m_creature->getVictim()->HasMana())
+                        continue;
+                    if (DoCastSpellIfCan(m_creature->getVictim(), SPELL_DRAIN_MANA) == CAST_OK)
+                    {
+                        SetActionReadyStatus(i, false);
+                        ResetTimer(i, GetSubsequentActionTimer(RayActions(i)));
+                        return;
+                    }
+                    continue;
+                case RAY_ACTION_TAIL_STING:
+                    if (!m_creature->getVictim() || m_creature->getVictim()->HasMana())
+                        continue;
+                    if (DoCastSpellIfCan(m_creature->getVictim(), SPELL_TAIL_STING) == CAST_OK)
+                    {
+                        SetActionReadyStatus(i, false);
+                        ResetTimer(i, GetSubsequentActionTimer(RayActions(i)));
+                        return;
+                    }
+                    continue;
+                case RAY_ACTION_NETHER_SHOCK:
+                    if (!m_creature->getVictim())
+                        continue;
+                    if (DoCastSpellIfCan(m_creature->getVictim(), SPELL_NETHER_SHOCK) == CAST_OK)
+                    {
+                        SetActionReadyStatus(i, false);
+                        ResetTimer(i, GetSubsequentActionTimer(RayActions(i)));
+                        return;
+                    }
+                    continue;
+            }
+        }
+    }
+
+    void UpdateAI(const uint32 diff)
+    {
+        UpdateTimers(diff, m_creature->isInCombat());
+
+        if (!m_creature->SelectHostileTarget() || !m_creature->getVictim())
+            return;
+
+        ExecuteActions();
+
+        DoMeleeAttackIfReady();
+    }
+};
+
+UnitAI* GetAI_npc_nether_ray(Creature* creature)
+{
+    return new npc_nether_rayAI(creature);
+}
+
 /*######
 ## npc_mage_mirror_image
 ######*/
@@ -2034,8 +2193,6 @@ void AddSC_npcs_special()
     pNewScript = new Script;
     pNewScript->Name = "npc_chicken_cluck";
     pNewScript->GetAI = &GetAI_npc_chicken_cluck;
-    pNewScript->pQuestAcceptNPC =   &QuestAccept_npc_chicken_cluck;
-    pNewScript->pQuestRewardedNPC = &QuestRewarded_npc_chicken_cluck;
     pNewScript->RegisterSelf();
 
     pNewScript = new Script;
@@ -2104,6 +2261,16 @@ void AddSC_npcs_special()
     pNewScript = new Script;
     pNewScript->Name = "npc_snakes";
     pNewScript->GetAI = &GetAI_npc_snakes;
+    pNewScript->RegisterSelf();
+
+    pNewScript = new Script;
+    pNewScript->Name = "npc_nether_ray";
+    pNewScript->GetAI = &GetAI_npc_nether_ray;
+    pNewScript->RegisterSelf();
+
+    pNewScript = new Script;
+    pNewScript->Name = "npc_aoe_damage_trigger";
+    pNewScript->GetAI = &GetAI_npc_aoe_damage_trigger;
     pNewScript->RegisterSelf();
 
     pNewScript = new Script;

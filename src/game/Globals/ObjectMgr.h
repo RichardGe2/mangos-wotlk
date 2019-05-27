@@ -500,7 +500,7 @@ SkillRangeType GetSkillRangeType(SkillLineEntry const* pSkill, bool racial);
 #define MAX_PET_NAME             12                         // max allowed by client name length
 #define MAX_CHARTER_NAME         24                         // max allowed by client name length
 
-bool normalizePlayerName(std::string& name);
+bool normalizePlayerName(std::string& name, size_t max_len = MAX_INTERNAL_PLAYER_NAME);
 
 struct LanguageDesc
 {
@@ -787,6 +787,8 @@ class ObjectMgr
         void LoadQuestPOI();
 
         void LoadNPCSpellClickSpells();
+        void LoadSpellTemplate();
+        void CheckSpellCones();
         void LoadCreatureTemplateSpells();
 
         void LoadGameTele();
@@ -795,7 +797,6 @@ class ObjectMgr
 
         void LoadGossipMenus();
 
-        void LoadSpellTemplate();
         void LoadDungeonEncounters();
         void LoadAreaGroups();
         void LoadSQLDBCs();

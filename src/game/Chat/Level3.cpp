@@ -1595,7 +1595,7 @@ bool ChatHandler::HandleMaxSkillCommand(char* /*args*/)
     }
 
     // each skills that have max skill value dependent from level seted to current level max skill value
-    SelectedPlayer->UpdateSkillsToMaxSkillsForLevel();
+    SelectedPlayer->UpdateSkillsForLevel(true);
     return true;
 }
 
@@ -1623,7 +1623,7 @@ bool ChatHandler::HandleSetSkillCommand(char* args)
         return false;
 
     int32 maxskill;
-    if (!ExtractOptInt32(&args, maxskill, target->GetPureMaxSkillValue(skill)))
+    if (!ExtractOptInt32(&args, maxskill, target->GetSkillMaxPure(skill)))
         return false;
 
     if (skill <= 0)
@@ -2642,6 +2642,7 @@ bool ChatHandler::HandleLearnAllDefaultCommand(char* args)
     if (!ExtractPlayerTarget(&args, &target))
         return false;
 
+    target->LearnDefaultSkills();
     target->learnDefaultSpells();
     target->learnQuestRewardedSpells();
 
@@ -3387,10 +3388,10 @@ bool ChatHandler::HandleLookupSkillCommand(char* args)
                 if (target && target->HasSkill(id))
                 {
                     knownStr = GetMangosString(LANG_KNOWN);
-                    uint32 curValue = target->GetPureSkillValue(id);
-                    uint32 maxValue  = target->GetPureMaxSkillValue(id);
-                    uint32 permValue = target->GetSkillPermBonusValue(id);
-                    uint32 tempValue = target->GetSkillTempBonusValue(id);
+                    uint32 curValue = target->GetSkillValuePure(id);
+                    uint32 maxValue  = target->GetSkillMaxPure(id);
+                    uint32 permValue = target->GetSkillBonusPermanent(id);
+                    uint32 tempValue = target->GetSkillBonusTemporary(id);
 
                     char const* valFormat = GetMangosString(LANG_SKILL_VALUES);
                     snprintf(valStr, 50, valFormat, curValue, maxValue, permValue, tempValue);
@@ -3953,6 +3954,24 @@ bool ChatHandler::HandleGetDistanceCommand(char* args)
     PSendSysMessage("T -> P Visible distance (Alert): %.2f", target->GetVisibleDistance(player, true));
     PSendSysMessage("T -> P Can trigger alert: %s", !target->IsWithinDistInMap(player, player->GetVisibleDistance(target)) ? "true" : "false");
 
+    return true;
+}
+
+bool ChatHandler::HandleGetLosCommand(char* args)
+{
+    Player* player = m_session->GetPlayer();
+    Unit* target = getSelectedUnit();
+    if (!target)
+    {
+        SendSysMessage(LANG_SELECT_CHAR_OR_CREATURE);
+        return false;
+    }
+
+    float x, y, z;
+    target->GetPosition(x, y, z);
+    bool normalLos = player->IsWithinLOS(x, y, z, false);
+    bool m2Los = player->IsWithinLOS(x, y, z, true);
+    PSendSysMessage("Los check: Normal: %s M2: %s", normalLos ? "true" : "false", m2Los ? "true" : "false");
     return true;
 }
 
@@ -5395,7 +5414,7 @@ bool ChatHandler::HandleDamageCommand(char* args)
     if (damage_int <= 0)
         return true;
 
-    uint32 damage = damage_int;
+    uint32 damage = uint32(damage_int);
 
     // flat melee damage without resistance/etc reduction
     if (!*args)
@@ -5422,14 +5441,18 @@ bool ChatHandler::HandleDamageCommand(char* args)
     if (!*args)
     {
         uint32 absorb = 0;
-        uint32 resist = 0;
+        int32 resist = 0;
 
         target->CalculateDamageAbsorbAndResist(player, schoolmask, SPELL_DIRECT_DAMAGE, damage, &absorb, &resist);
 
-        if (damage <= absorb + resist)
+        const uint32 bonus = (resist < 0 ? uint32(std::abs(resist)) : 0);
+        damage += bonus;
+        const uint32 malus = (resist > 0 ? (absorb + uint32(resist)) : absorb);
+
+        if (damage <= malus)
             return true;
 
-        damage -= absorb + resist;
+        damage -= malus;
 
         player->DealDamageMods(target, damage, &absorb, DIRECT_DAMAGE);
         player->DealDamage(target, damage, nullptr, DIRECT_DAMAGE, schoolmask, nullptr, false);
@@ -5736,7 +5759,7 @@ bool ChatHandler::HandleNpcInfoCommand(char* /*args*/)
         curRespawnDelay = 0;
     std::string curRespawnDelayStr = secsToTimeString(curRespawnDelay, true);
     std::string defRespawnDelayStr = secsToTimeString(target->GetRespawnDelay(), true);
-    std::string curCorpseDecayStr = secsToTimeString(time_t(target->GetCorpseDecayTimer() / IN_MILLISECONDS), true);
+    std::string curCorpseDecayStr = secsToTimeString(std::chrono::system_clock::to_time_t(target->GetCorpseDecayTimer()), true);
 
     // Send information dependend on difficulty mode
     CreatureInfo const* baseInfo = ObjectMgr::GetCreatureTemplate(Entry);
@@ -5795,8 +5818,8 @@ bool ChatHandler::HandleNpcThreatCommand(char* /*args*/)
         Unit* pUnit = itr->getTarget();
 
         if (pUnit)
-            // Player |cffff0000%s|r [GUID: %u] has |cffff0000%f|r threat and taunt state %u
-            PSendSysMessage(LANG_NPC_THREAT_PLAYER, pUnit->GetName(), pUnit->GetGUIDLow(), target->getThreatManager().getThreat(pUnit), itr->GetTauntState());
+            // Player |cffff0000%s|r [GUID: %u] has |cffff0000%f|r threat, taunt state %u and hostile state %u
+            PSendSysMessage(LANG_NPC_THREAT_PLAYER, pUnit->GetName(), pUnit->GetGUIDLow(), target->getThreatManager().getThreat(pUnit), itr->GetTauntState(), itr->GetHostileState());
     }
     
     return true;
@@ -6378,7 +6401,7 @@ bool ChatHandler::HandleTeleDelCommand(char* args)
     return true;
 }
 
-bool ChatHandler::HandleListAurasCommand(char* /*args*/)
+bool ChatHandler::HandleListAurasCommand(char* args)
 {
     Unit* unit = getSelectedUnit();
     if (!unit)
@@ -6388,42 +6411,79 @@ bool ChatHandler::HandleListAurasCommand(char* /*args*/)
         return false;
     }
 
+    uint32 auraNameId;
+    ExtractOptUInt32(&args, auraNameId, 0);
+
     char const* talentStr = GetMangosString(LANG_TALENT);
     char const* passiveStr = GetMangosString(LANG_PASSIVE);
 
-    Unit::SpellAuraHolderMap const& uAuras = unit->GetSpellAuraHolderMap();
-    PSendSysMessage(LANG_COMMAND_TARGET_LISTAURAS, uAuras.size());
-    for (const auto& uAura : uAuras)
+    if (!auraNameId)
     {
-        bool talent = GetTalentSpellCost(uAura.second->GetId()) > 0;
-
-        SpellAuraHolder* holder = uAura.second;
-        char const* name = holder->GetSpellProto()->SpellName[GetSessionDbcLocale()];
-
-        for (int32 i = 0; i < MAX_EFFECT_INDEX; ++i)
+        Unit::SpellAuraHolderMap const& uAuras = unit->GetSpellAuraHolderMap();
+        PSendSysMessage(LANG_COMMAND_TARGET_LISTAURAS, uAuras.size());
+        for (Unit::SpellAuraHolderMap::const_iterator itr = uAuras.begin(); itr != uAuras.end(); ++itr)
         {
-            Aura* aur = holder->GetAuraByEffectIndex(SpellEffectIndex(i));
-            if (!aur)
-                continue;
+            bool talent = GetTalentSpellCost(itr->second->GetId()) > 0;
+
+            SpellAuraHolder* holder = itr->second;
+            char const* name = holder->GetSpellProto()->SpellName[GetSessionDbcLocale()];
+
+            for (int32 i = 0; i < MAX_EFFECT_INDEX; ++i)
+            {
+                Aura* aur = holder->GetAuraByEffectIndex(SpellEffectIndex(i));
+                if (!aur)
+                    continue;
+
+                if (m_session)
+                {
+                    std::ostringstream ss_name;
+                    ss_name << "|cffffffff|Hspell:" << itr->second->GetId() << "|h[" << name << "]|h|r";
+
+                    PSendSysMessage(LANG_COMMAND_TARGET_AURADETAIL, holder->GetId(), aur->GetEffIndex(),
+                        aur->GetModifier()->m_auraname, aur->GetAuraDuration(), aur->GetAuraMaxDuration(),
+                        ss_name.str().c_str(),
+                        (holder->IsPassive() ? passiveStr : ""), (talent ? talentStr : ""),
+                        holder->GetCasterGuid().GetString().c_str(), holder->GetStackAmount());
+                }
+                else
+                {
+                    PSendSysMessage(LANG_COMMAND_TARGET_AURADETAIL, holder->GetId(), aur->GetEffIndex(),
+                        aur->GetModifier()->m_auraname, aur->GetAuraDuration(), aur->GetAuraMaxDuration(),
+                        name,
+                        (holder->IsPassive() ? passiveStr : ""), (talent ? talentStr : ""),
+                        holder->GetCasterGuid().GetString().c_str(), holder->GetStackAmount());
+                }
+            }
+        }
+    }
+
+    uint32 i = auraNameId ? auraNameId : 0;
+    uint32 max = auraNameId ? auraNameId + 1 : TOTAL_AURAS;
+    for (; i < max; ++i)
+    {
+        Unit::AuraList const& uAuraList = unit->GetAurasByType(AuraType(i));
+        if (uAuraList.empty()) continue;
+        PSendSysMessage(LANG_COMMAND_TARGET_LISTAURATYPE, uAuraList.size(), i);
+        for (Unit::AuraList::const_iterator itr = uAuraList.begin(); itr != uAuraList.end(); ++itr)
+        {
+            bool talent = GetTalentSpellCost((*itr)->GetId()) > 0;
+
+            char const* name = (*itr)->GetSpellProto()->SpellName[GetSessionDbcLocale()];
 
             if (m_session)
             {
                 std::ostringstream ss_name;
-                ss_name << "|cffffffff|Hspell:" << uAura.second->GetId() << "|h[" << name << "]|h|r";
+                ss_name << "|cffffffff|Hspell:" << (*itr)->GetId() << "|h[" << name << "]|h|r";
 
-                PSendSysMessage(LANG_COMMAND_TARGET_AURADETAIL, holder->GetId(), aur->GetEffIndex(),
-                                aur->GetModifier()->m_auraname, aur->GetAuraDuration(), aur->GetAuraMaxDuration(),
-                                ss_name.str().c_str(),
-                                (holder->IsPassive() ? passiveStr : ""), (talent ? talentStr : ""),
-                                holder->GetCasterGuid().GetString().c_str(), holder->GetStackAmount());
+                PSendSysMessage(LANG_COMMAND_TARGET_AURASIMPLE, (*itr)->GetId(), (*itr)->GetEffIndex(),
+                                ss_name.str().c_str(), ((*itr)->GetHolder()->IsPassive() ? passiveStr : ""), (talent ? talentStr : ""),
+                                (*itr)->GetCasterGuid().GetString().c_str());
             }
             else
             {
-                PSendSysMessage(LANG_COMMAND_TARGET_AURADETAIL, holder->GetId(), aur->GetEffIndex(),
-                                aur->GetModifier()->m_auraname, aur->GetAuraDuration(), aur->GetAuraMaxDuration(),
-                                name,
-                                (holder->IsPassive() ? passiveStr : ""), (talent ? talentStr : ""),
-                                holder->GetCasterGuid().GetString().c_str(), holder->GetStackAmount());
+                PSendSysMessage(LANG_COMMAND_TARGET_AURASIMPLE, (*itr)->GetId(), (*itr)->GetEffIndex(),
+                                name, ((*itr)->GetHolder()->IsPassive() ? passiveStr : ""), (talent ? talentStr : ""),
+                                (*itr)->GetCasterGuid().GetString().c_str());
             }
         }
     }
@@ -7141,9 +7201,6 @@ bool ChatHandler::HandleBanHelper(BanMode mode, char* args)
                     break;
                 case BAN_CHARACTER:
                     PSendSysMessage(LANG_BAN_NOTFOUND, "character", nameOrIP.c_str());
-                    break;
-                case BAN_IP:
-                    PSendSysMessage(LANG_BAN_NOTFOUND, "ip", nameOrIP.c_str());
                     break;
             }
             SetSentErrorMessage(true);
@@ -8608,9 +8665,29 @@ bool ChatHandler::HandleSendMessageCommand(char* args)
     return true;
 }
 
-bool ChatHandler::HandleFlushArenaPointsCommand(char* /*args*/)
+bool ChatHandler::HandleArenaFlushPointsCommand(char* /*args*/)
 {
     sBattleGroundMgr.DistributeArenaPoints();
+    return true;
+}
+
+bool ChatHandler::HandleArenaSeasonRewardsCommand(char* args)
+{
+    uint32 seasonId;
+    if (!ExtractUInt32(&args, seasonId))
+        return false;
+
+    if (seasonId > 4 || seasonId == 0)
+        return false;
+
+    sBattleGroundMgr.RewardArenaSeason(seasonId);
+    return true;
+}
+
+bool ChatHandler::HandleArenaDataReset(char* args)
+{
+    PSendSysMessage("Resetting all arena data.");
+    sBattleGroundMgr.ResetAllArenaData();
     return true;
 }
 

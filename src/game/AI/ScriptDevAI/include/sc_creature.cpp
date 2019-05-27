@@ -237,49 +237,49 @@ void FillSpellSummary()
         for (uint8 j = 0; j < 3; ++j)
         {
             // Spell targets self
-            if (tempSpell->EffectImplicitTargetA[j] == TARGET_SELF)
+            if (tempSpell->EffectImplicitTargetA[j] == TARGET_UNIT_CASTER)
                 SpellSummary[i].Targets |= 1 << (SELECT_TARGET_SELF - 1);
 
             // Spell targets a single enemy
-            if (tempSpell->EffectImplicitTargetA[j] == TARGET_CHAIN_DAMAGE ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_CURRENT_ENEMY_COORDINATES)
+            if (tempSpell->EffectImplicitTargetA[j] == TARGET_UNIT_ENEMY ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_LOCATION_CASTER_TARGET_POSITION)
                 SpellSummary[i].Targets |= 1 << (SELECT_TARGET_SINGLE_ENEMY - 1);
 
             // Spell targets AoE at enemy
-            if (tempSpell->EffectImplicitTargetA[j] == TARGET_ALL_ENEMY_IN_AREA ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_ALL_ENEMY_IN_AREA_INSTANT ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_CASTER_COORDINATES ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_ALL_ENEMY_IN_AREA_CHANNELED)
+            if (tempSpell->EffectImplicitTargetA[j] == TARGET_ENUM_UNITS_ENEMY_AOE_AT_SRC_LOC ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_ENUM_UNITS_ENEMY_AOE_AT_DEST_LOC ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_LOCATION_CASTER_SRC ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_ENUM_UNITS_ENEMY_AOE_AT_DYNOBJ_LOC)
                 SpellSummary[i].Targets |= 1 << (SELECT_TARGET_AOE_ENEMY - 1);
 
             // Spell targets an enemy
-            if (tempSpell->EffectImplicitTargetA[j] == TARGET_CHAIN_DAMAGE ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_CURRENT_ENEMY_COORDINATES ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_ALL_ENEMY_IN_AREA ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_ALL_ENEMY_IN_AREA_INSTANT ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_CASTER_COORDINATES ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_ALL_ENEMY_IN_AREA_CHANNELED)
+            if (tempSpell->EffectImplicitTargetA[j] == TARGET_UNIT_ENEMY ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_LOCATION_CASTER_TARGET_POSITION ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_ENUM_UNITS_ENEMY_AOE_AT_SRC_LOC ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_ENUM_UNITS_ENEMY_AOE_AT_DEST_LOC ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_LOCATION_CASTER_SRC ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_ENUM_UNITS_ENEMY_AOE_AT_DYNOBJ_LOC)
                 SpellSummary[i].Targets |= 1 << (SELECT_TARGET_ANY_ENEMY - 1);
 
             // Spell targets a single friend(or self)
-            if (tempSpell->EffectImplicitTargetA[j] == TARGET_SELF ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_SINGLE_FRIEND ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_SINGLE_PARTY)
+            if (tempSpell->EffectImplicitTargetA[j] == TARGET_UNIT_CASTER ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_UNIT_FRIEND ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_UNIT_PARTY)
                 SpellSummary[i].Targets |= 1 << (SELECT_TARGET_SINGLE_FRIEND - 1);
 
             // Spell targets aoe friends
-            if (tempSpell->EffectImplicitTargetA[j] == TARGET_ALL_PARTY_AROUND_CASTER ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_AREAEFFECT_PARTY ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_CASTER_COORDINATES)
+            if (tempSpell->EffectImplicitTargetA[j] == TARGET_ENUM_UNITS_PARTY_WITHIN_CASTER_RANGE ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_UNIT_FRIEND_AND_PARTY ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_LOCATION_CASTER_SRC)
                 SpellSummary[i].Targets |= 1 << (SELECT_TARGET_AOE_FRIEND - 1);
 
             // Spell targets any friend(or self)
-            if (tempSpell->EffectImplicitTargetA[j] == TARGET_SELF ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_SINGLE_FRIEND ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_SINGLE_PARTY ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_ALL_PARTY_AROUND_CASTER ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_AREAEFFECT_PARTY ||
-                    tempSpell->EffectImplicitTargetA[j] == TARGET_CASTER_COORDINATES)
+            if (tempSpell->EffectImplicitTargetA[j] == TARGET_UNIT_CASTER ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_UNIT_FRIEND ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_UNIT_PARTY ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_ENUM_UNITS_PARTY_WITHIN_CASTER_RANGE ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_UNIT_FRIEND_AND_PARTY ||
+                    tempSpell->EffectImplicitTargetA[j] == TARGET_LOCATION_CASTER_SRC)
                 SpellSummary[i].Targets |= 1 << (SELECT_TARGET_ANY_FRIEND - 1);
 
             // Make sure that this spell includes a damage effect
@@ -401,6 +401,8 @@ enum
     NPC_NETHERMANCER_SEPETHREA  = 19221,
     NPC_MOROES                  = 15687,
     NPC_MOROGRIM_TIDEWALKER     = 21213,
+    NPC_NAZAN                   = 17536,
+    NPC_VAZRUDEN                = 17537,
     NPC_ANUBARAK                = 29120,
     NPC_SINDRAGOSA              = 36853,
     NPC_ZARITHRIAN              = 39746,
@@ -445,7 +447,7 @@ bool ScriptedAI::EnterEvadeIfOutOfCombatArea(const uint32 diff)
             break;
         }
         case NPC_KARGATH_BLADEFIST:
-            if (x < 255.0f && x > 205.0f)
+            if (x < 270.0f && x > 185.0f)
                 return false;
             break;
         case NPC_NETHERMANCER_SEPETHREA:
@@ -453,7 +455,7 @@ bool ScriptedAI::EnterEvadeIfOutOfCombatArea(const uint32 diff)
                 return false;
             break;
         case NPC_MOROES:                                    // Moroes - Generate bounding box - TODO: Despawn Remaining Adds upon Evade after Death
-            if (x > -11027.73f && x < -10946.64f && y > -1952.38f && y < -1861.11f)
+            if (x > -11030.f && x < -10943.f && y > -1955.f && y < -1860.f)
                 return false;
             break;
         case NPC_MOROGRIM_TIDEWALKER:                       // Morogrim - Natural Box made by room
@@ -471,6 +473,11 @@ bool ScriptedAI::EnterEvadeIfOutOfCombatArea(const uint32 diff)
             if (z > 87.0f)
                 return false;
             break;
+        case NPC_VAZRUDEN:
+        case NPC_NAZAN:
+            if (x < -1336.0f)
+                return false;
+            break;
         default:
             script_error_log("EnterEvadeIfOutOfCombatArea used for creature entry %u, but does not have any definition.", m_creature->GetEntry());
             return false;
@@ -478,6 +485,14 @@ bool ScriptedAI::EnterEvadeIfOutOfCombatArea(const uint32 diff)
 
     EnterEvadeMode();
     return true;
+}
+
+void ScriptedAI::DespawnGuids(GuidVector& spawns)
+{
+    for (ObjectGuid& guid : spawns)
+        if (Creature* spawn = m_creature->GetMap()->GetCreature(guid))
+            spawn->ForcedDespawn();
+    spawns.clear();
 }
 
 void Scripted_NoMovementAI::GetAIInformation(ChatHandler& reader)

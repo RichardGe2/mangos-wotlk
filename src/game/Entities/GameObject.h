@@ -657,7 +657,7 @@ class GameObject : public WorldObject
 
         bool Create(uint32 guidlow, uint32 name_id, Map* map, uint32 phaseMask, float x, float y, float z, float ang,
                     const QuaternionData& rotation = QuaternionData(), uint8 animprogress = GO_ANIMPROGRESS_DEFAULT, GOState go_state = GO_STATE_READY);
-        void Update(uint32 update_diff, uint32 p_time) override;
+        void Update(const uint32 diff) override;
         GameObjectInfo const* GetGOInfo() const;
 
         bool IsTransport() const;
@@ -789,8 +789,10 @@ class GameObject : public WorldObject
         bool CanAttackSpell(Unit const* target, SpellEntry const* spellInfo = nullptr, bool isAOE = false) const override;
         bool CanAssistSpell(Unit const* target, SpellEntry const* spellInfo = nullptr) const override;
 
-        void SummonLinkedTrapIfAny() const;
+        GameObject* SummonLinkedTrapIfAny() const;
         void TriggerLinkedGameObject(Unit* target) const;
+        GameObject* GetLinkedTrap();
+        void SetLinkedTrap(GameObject* linkedTrap) { m_linkedTrap = linkedTrap->GetObjectGuid(); }
 
         // Destructible GO handling
         void DealGameObjectDamage(uint32 damage, uint32 spell, Unit* caster);
@@ -863,6 +865,8 @@ class GameObject : public WorldObject
         uint32 m_delayedActionTimer;                        // used for delayed GO actions
 
         ObjectGuid m_actionTarget;                          // used for setting target of Summoning rituals
+
+        ObjectGuid m_linkedTrap;
 
         std::unique_ptr<GameObjectAI> m_AI;
 

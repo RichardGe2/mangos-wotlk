@@ -62,6 +62,7 @@ enum CreatureFlagsExtra
     CREATURE_EXTRA_FLAG_FORCE_ATTACKING_CAPABILITY = 0x00080000,   // 524288 SetForceAttackingCapability(true); for nonattackable, nontargetable creatures that should be able to attack nontheless
     CREATURE_EXTRA_FLAG_COUNT_SPAWNS           = 0x00200000,       // 2097152 count creature spawns in Map*
     CREATURE_EXTRA_FLAG_HASTE_SPELL_IMMUNITY   = 0x00400000,       // 4194304 immunity to COT or Mind Numbing Poison - very common in instances
+    CREATURE_EXTRA_FLAG_DUAL_WIELD_FORCED      = 0x00800000,       // 8388606 creature is alwyas dual wielding (even if unarmed)
 };
 
 // GCC have alternative #pragma pack(N) syntax and old gcc version not support pack(push,N), also any gcc version not support it at some platform
@@ -87,8 +88,7 @@ struct CreatureInfo
     uint32  MaxLevel;
     uint32  DifficultyEntry[MAX_DIFFICULTY - 1];
     uint32  ModelId[MAX_CREATURE_MODEL];
-    uint32  FactionAlliance;
-    uint32  FactionHorde;
+    uint32  Faction;
     float   Scale;
     uint32  Family;                                         // enum CreatureFamily values (optional)
     uint32  CreatureType;                                   // enum CreatureType values
@@ -372,6 +372,7 @@ enum SelectFlags
     SELECT_FLAG_RANGE_AOE_RANGE     = 0x0800,               // For AOE targeted abilities like frost nova
     SELECT_FLAG_POWER_NOT_MANA      = 0x1000,               // Used in some dungeon encounters
     SELECT_FLAG_USE_EFFECT_RADIUS   = 0x2000,               // For AOE targeted abilities which have correct data in effect index 0
+    SELECT_FLAG_SKIP_TANK           = 0x4000,               // Not getVictim - tank is not always top threat
 };
 
 enum RegenStatsFlags
@@ -573,7 +574,7 @@ class Creature : public Unit
         void RemoveFromWorld() override;
         virtual void CleanupsBeforeDelete() override;
 
-        bool Create(uint32 guidlow, CreatureCreatePos& cPos, CreatureInfo const* cinfo, Team team = TEAM_NONE, const CreatureData* data = nullptr, GameEventCreatureData const* eventData = nullptr);
+        bool Create(uint32 guidlow, CreatureCreatePos& cPos, CreatureInfo const* cinfo, const CreatureData* data = nullptr, GameEventCreatureData const* eventData = nullptr);
         bool LoadCreatureAddon(bool reload);
 
         // SelectLevel set creature bases stats for given level or for default levels stored in db
@@ -584,7 +585,7 @@ class Creature : public Unit
 
         char const* GetSubName() const { return GetCreatureInfo()->SubName; }
 
-        void Update(uint32 update_diff, uint32 diff) override;  // overwrite Unit::Update
+        void Update(const uint32 diff) override;  // overwrite Unit::Update
 
         virtual void RegenerateAll(uint32 update_diff);
         uint32 GetEquipmentId() const { return m_equipmentId; }
@@ -604,7 +605,7 @@ class Creature : public Unit
         bool IsDespawned() const { return getDeathState() ==  DEAD; }
         void SetCorpseDelay(uint32 delay) { m_corpseDelay = delay; }
         void ReduceCorpseDecayTimer();
-        uint32 GetCorpseDecayTimer() const { return m_corpseDecayTimer; }
+        TimePoint GetCorpseDecayTimer() const { return m_corpseExpirationTime; }
         bool IsRacialLeader() const { return GetCreatureInfo()->RacialLeader; }
         bool IsCivilian() const { return (GetCreatureInfo()->ExtraFlags & CREATURE_EXTRA_FLAG_CIVILIAN) != 0; }
         bool IsNoAggroOnSight() const { return (GetCreatureInfo()->ExtraFlags & CREATURE_EXTRA_FLAG_NO_AGGRO_ON_SIGHT) != 0; }
@@ -621,7 +622,7 @@ class Creature : public Unit
 
         void FillGuidsListFromThreatList(GuidVector& guids, uint32 maxamount = 0);
 
-        bool IsImmuneToSpell(SpellEntry const* spellInfo, bool castOnSelf) override;
+        bool IsImmuneToSpell(SpellEntry const* spellInfo, bool castOnSelf, uint8 effectMask) override;
         bool IsImmuneToDamage(SpellSchoolMask meleeSchoolMask) override;
         bool IsImmuneToSpellEffect(SpellEntry const* spellInfo, SpellEffectIndex index, bool castOnSelf) const override;
 
@@ -672,12 +673,10 @@ class Creature : public Unit
         // TODO: Research mob shield block values
         uint32 GetShieldBlockValue() const override { return (getLevel() / 2 + uint32(GetStat(STAT_STRENGTH) / 20)); }
 
-        SpellSchoolMask GetMeleeDamageSchoolMask() const override { return m_meleeDamageSchoolMask; }
-        void SetMeleeDamageSchool(SpellSchools school) { m_meleeDamageSchoolMask = SpellSchoolMask(1 << school); }
-
         bool HasSpell(uint32 spellID) const override;
 
-        bool UpdateEntry(uint32 Entry, Team team = ALLIANCE, const CreatureData* data = nullptr, GameEventCreatureData const* eventData = nullptr, bool preserveHPAndPower = true);
+        bool UpdateEntry(uint32 Entry, const CreatureData* data = nullptr, GameEventCreatureData const* eventData = nullptr, bool preserveHPAndPower = true);
+        void ResetEntry();
 
         void ApplyGameEventSpells(GameEventCreatureData const* eventData, bool activated);
         bool UpdateStats(Stats stat) override;
@@ -822,6 +821,9 @@ class Creature : public Unit
 
         void SetVirtualItem(VirtualItemSlot slot, uint32 item_id) { SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + slot, item_id); }
 
+        bool hasWeapon(WeaponAttackType type) const override;
+        bool hasWeaponForAttack(WeaponAttackType type) const override { return (Unit::hasWeaponForAttack(type) && hasWeapon(type)); }
+
         void SetInvisible(bool invisible) { m_isInvisible = invisible; }
         bool IsInvisible() const { return m_isInvisible; }
 
@@ -844,15 +846,26 @@ class Creature : public Unit
 
         bool CanAggro() const { return m_canAggro; }
         void SetCanAggro(bool canAggro) { m_canAggro = canAggro; }
+
+        void SetNoRewards() { m_noXP = true; m_noLoot = true; m_noReputation = true; }
+        bool IsNoXp() { return m_noXP; }
+        void SetNoXP(bool state) { m_noXP = state; }
+        bool IsNoLoot() { return m_noLoot; }
+        void SetNoLoot(bool state) { m_noLoot = state; }
+        bool IsNoReputation() { return m_noReputation; }
+        void SetNoReputation(bool state) { m_noReputation = state; }
+
     protected:
         bool MeetsSelectAttackingRequirement(Unit* pTarget, SpellEntry const* pSpellInfo, uint32 selectFlags, SelectAttackingTargetParams params) const;
 
-        bool CreateFromProto(uint32 guidlow, CreatureInfo const* cinfo, Team team, const CreatureData* data = nullptr, GameEventCreatureData const* eventData = nullptr);
+        bool CreateFromProto(uint32 guidlow, CreatureInfo const* cinfo, const CreatureData* data = nullptr, GameEventCreatureData const* eventData = nullptr);
         bool InitEntry(uint32 Entry, const CreatureData* data = nullptr, GameEventCreatureData const* eventData = nullptr);
 
         uint32 GetCreatureConditionalSpawnEntry(uint32 guidlow, Map* map) const;
 
         void UnsummonCleanup(); // cleans up data before unsummon of various creatures
+
+        bool IsCorpseExpired() const;
 
         // vendor items
         VendorItemCounts m_vendorItemCounts;
@@ -863,7 +876,7 @@ class Creature : public Unit
         CreatureLootStatus m_lootStatus;                    // loot status (used to know when we could loot, pickpocket or skin)
 
         /// Timers
-        uint32 m_corpseDecayTimer;                          // (msecs)timer for death or corpse disappearance
+        TimePoint m_corpseExpirationTime;                   // (msecs) time point of corpse decay
         time_t m_respawnTime;                               // (secs) time of next respawn
         uint32 m_respawnDelay;                              // (secs) delay between corpse disappearance and respawning
         uint32 m_corpseDelay;                               // (secs) delay between death and corpse disappearance
@@ -883,16 +896,20 @@ class Creature : public Unit
         bool m_isDeadByDefault;
         uint32 m_temporaryFactionFlags;                     // used for real faction changes (not auras etc)
 
-        SpellSchoolMask m_meleeDamageSchoolMask;
         uint32 m_originalEntry;
 
         Position m_combatStartPos;                          // after combat contains last position
         Position m_respawnPos;
 
+        uint32 m_gameEventVendorId;                         // game event creature data vendor id override
+
         std::unique_ptr<UnitAI> m_ai;
         bool m_isInvisible;
         bool m_ignoreMMAP;
         bool m_forceAttackingCapability;                    // can attack even if not selectable/not attackable
+        bool m_noXP;
+        bool m_noLoot;
+        bool m_noReputation;
 
         void SetBaseWalkSpeed(float speed) override;
         void SetBaseRunSpeed(float speed) override;

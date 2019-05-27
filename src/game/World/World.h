@@ -184,12 +184,9 @@ enum eConfigUInt32Values
     CONFIG_UINT32_CLIENTCACHE_VERSION,
     CONFIG_UINT32_GUILD_EVENT_LOG_COUNT,
     CONFIG_UINT32_GUILD_BANK_EVENT_LOG_COUNT,
-    CONFIG_UINT32_TIMERBAR_FATIGUE_GMLEVEL,
-    CONFIG_UINT32_TIMERBAR_FATIGUE_MAX,
-    CONFIG_UINT32_TIMERBAR_BREATH_GMLEVEL,
-    CONFIG_UINT32_TIMERBAR_BREATH_MAX,
-    CONFIG_UINT32_TIMERBAR_FIRE_GMLEVEL,
-    CONFIG_UINT32_TIMERBAR_FIRE_MAX,
+    CONFIG_UINT32_MIRRORTIMER_FATIGUE_MAX,
+    CONFIG_UINT32_MIRRORTIMER_BREATH_MAX,
+    CONFIG_UINT32_MIRRORTIMER_ENVIRONMENTAL_MAX,
     CONFIG_UINT32_MIN_LEVEL_STAT_SAVE,
     CONFIG_UINT32_CHARDELETE_KEEP_DAYS,
     CONFIG_UINT32_CHARDELETE_METHOD,
@@ -361,6 +358,7 @@ enum eConfigBoolValues
     CONFIG_BOOL_CLEAN_CHARACTER_DB,
     CONFIG_BOOL_VMAP_INDOOR_CHECK,
     CONFIG_BOOL_PET_UNSUMMON_AT_MOUNT,
+    CONFIG_BOOL_PET_ATTACK_FROM_BEHIND,
     CONFIG_BOOL_MMAP_ENABLED,
     CONFIG_BOOL_PLAYER_COMMANDS,
     CONFIG_BOOL_PATH_FIND_OPTIMIZE,
@@ -626,6 +624,7 @@ class World
         **/
         void InvalidatePlayerDataToAllClient(ObjectGuid guid) const;
 
+        static uint32 GetCurrentMSTime() { return m_currentMSTime; }
         static TimePoint GetCurrentClockTime() { return m_currentTime; }
         static uint32 GetCurrentDiff() { return m_currentDiff; }
 
@@ -733,6 +732,7 @@ class World
 
         std::vector<std::string> m_spamRecords;
 
+        static uint32 m_currentMSTime;
         static TimePoint m_currentTime;
         static uint32 m_currentDiff;
 };
