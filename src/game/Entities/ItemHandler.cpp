@@ -293,62 +293,6 @@ void WorldSession::HandleItemQuerySingleOpcode(WorldPacket& recv_data)
 
         std::string name = pProto->Name1;
         std::string description = pProto->Description;
-
-
-
-		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-		// RICHARD : rajouter le sell price et l'item level  a la description des items
-
-
-		std::string newdescription =  "\n";
-
-		bool textRichaLevel = false;
-		if ( pProto->ItemLevel > 1 )
-		{
-			newdescription += std::string("Niveau de l'objet: ") + std::to_string(pProto->ItemLevel) + std::string("\n");
-			textRichaLevel = true;
-			
-		}
-
-		int goldAmount = pProto->SellPrice;
-		
-
-
-		if ( goldAmount == 0 )
-		{
-			newdescription += std::string("Pas de prix");
-		}
-		else
-		{
-			int nbpo = goldAmount / 10000;
-			int nbpa = (goldAmount - nbpo*10000) / 100;
-			int nbpc = (goldAmount - nbpo*10000 - nbpa*100) ;
-
-			newdescription += std::string("Prix par objet: ") 
-				+ std::to_string(nbpo) + "  "
-				+ std::to_string(nbpa) + "  "
-				+ std::to_string(nbpc) 
-				
-				;
-		
-		}
-		
-
-		if ( description.length() > 0 )
-		{
-			
-			newdescription += "\n" + description;
-		}
-
-		description = newdescription;
-
-		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
         sObjectMgr.GetItemLocaleStrings(pProto->ItemId, loc_idx, &name, &description);
 
         // guess size

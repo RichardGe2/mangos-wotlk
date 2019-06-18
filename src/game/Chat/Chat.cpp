@@ -1787,6 +1787,10 @@ bool ChatHandler::ExecuteCommand_richard_D(const char* text)
 // exemple :  |cffffffff|Hitem:2692:0:0:0|h[Hot Spices]|h|r
 // exemple :  |cff1eff00|Hitem:70010:0:0:0|h[YouhaiCoin Paragon]|h|r
 //exemple :   |cffa335ee|Hitem:13353:0:0:0|h[Book of the Dead]|h|r
+//
+// exemple pour WOTLK :
+// " |cffffffff|Hitem:6948:0:0:0:0:0:0:0:1|h[Pierre de foyer]|h|r"   ( avec un espace au debut ! )
+//
 //je crois que le premier nombre est la couleur
 bool ChatHandler::ExecuteCommand_richard_A(const char* text)
 {
@@ -1807,7 +1811,7 @@ bool ChatHandler::ExecuteCommand_richard_A(const char* text)
 		return false;
 	}
 
-	const char beg[] = "|cffffffff|Hitem:";
+	const char beg[] = " |cffffffff|Hitem:";
 	
 	int i=0;
 	for(;;i++)
@@ -1817,7 +1821,7 @@ bool ChatHandler::ExecuteCommand_richard_A(const char* text)
 			break;
 		}
 
-		if ( i >= 2 && i <= 9 )
+		if ( i >= 3 && i <= 10 )
 		{
 			if (   text[i] >= '0' && text[i] <= '9'
 				|| text[i] >= 'a' && text[i] <= 'f')
